@@ -119,8 +119,8 @@ const JobDetails = () => {
                                 <h1 className="text-3xl font-bold text-white mb-2">{job.title}</h1>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${job.status === 'PUBLISHED' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                    job.status === 'CLOSED' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                        'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                job.status === 'CLOSED' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
                                 }`}>
                                 {job.status}
                             </span>

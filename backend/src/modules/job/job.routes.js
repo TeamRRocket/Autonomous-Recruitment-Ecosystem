@@ -1,5 +1,6 @@
 import express from 'express';
 import * as jobController from './job.controller.js';
+import * as recommendationController from './recommendation.controller.js';
 import { protect, restrictTo } from '../../middleware/authMiddleware.js';
 import requireProfileCompleted from '../../middleware/requireProfileCompleted.js';
 import requireOwnership from '../../middleware/requireOwnership.js';
@@ -13,6 +14,7 @@ router.use(requireProfileCompleted);
 // Public (Authenticated) Routes - Specific routes must come before parameterized routes
 router.get('/published', jobController.getPublishedJobs); // Explicit published list
 router.get('/search', jobController.searchJobs); // Search jobs
+router.get('/recommendations', recommendationController.getRecommendations); // AI Recommendations
 router.get('/', jobController.getPublishedJobs); // Default: published jobs
 
 // Recruiter Only Routes - Specific routes before parameterized

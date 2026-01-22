@@ -9,8 +9,10 @@ import {
     Settings,
     LogOut,
     Building2,
-    CheckCircle2
+    CheckCircle2,
+    Sparkles
 } from 'lucide-react';
+
 
 const Sidebar = () => {
     const { user, profile, logout } = useAuth();
@@ -20,6 +22,7 @@ const Sidebar = () => {
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Find Jobs', path: '/jobs', icon: Briefcase }, // Assuming /jobs is the list
         { name: 'My Applications', path: '/applications', icon: FileText }, // Placeholder
+        { name: 'AI Recommendations', path: '/recommendations', icon: Sparkles },
         { name: 'Profile', path: '/profile', icon: Users },
     ];
 
@@ -82,6 +85,8 @@ const Sidebar = () => {
                         )}
                     </NavLink>
                 ))}
+
+
             </nav>
 
             {/* User Profile Summary & Logout */}

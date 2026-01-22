@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Mail, Briefcase, MapPin, Code2, Building2, Save, LogOut } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Code2, Building2, Save, LogOut, Target } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { updateCandidateProfile } from '../services/candidateService';
 import { updateRecruiterProfile } from '../services/recruiterService';
@@ -112,7 +112,7 @@ const Profile = () => {
 
                         {/* Role Field */}
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Role in Company</label>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">{user?.role === 'CANDIDATE' ? 'Preferred Job Title' : 'Role in Company'}</label>
                             <div className="relative group">
                                 <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={18} />
                                 <input
@@ -121,11 +121,49 @@ const Profile = () => {
                                     value={(user?.role === 'CANDIDATE' ? formData.preferred_roles : formData.job_title) || ''}
                                     onChange={handleInputChange}
                                     disabled={!isEditing}
-                                    placeholder="e.g. Senior Recruiter"
+                                    placeholder={user?.role === 'CANDIDATE' ? "e.g. Software Engineer" : "e.g. Head of Talent"}
                                     className="w-full bg-slate-800/40 border border-slate-700/50 rounded-2xl py-3.5 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40 disabled:opacity-50 transition-all font-medium"
                                 />
                             </div>
                         </div>
+
+                        {user?.role === 'CANDIDATE' && (
+                            <>
+                                {/* Primary Skills */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Primary Technical Skills (Comma separated)</label>
+                                    <div className="relative group">
+                                        <Code2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={18} />
+                                        <input
+                                            type="text"
+                                            name="primary_skills"
+                                            value={formData.primary_skills || ''}
+                                            onChange={handleInputChange}
+                                            disabled={!isEditing}
+                                            placeholder="e.g. React, Node.js, Python"
+                                            className="w-full bg-slate-800/40 border border-slate-700/50 rounded-2xl py-3.5 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40 disabled:opacity-50 transition-all font-medium"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Secondary Skills */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Secondary / Soft Skills</label>
+                                    <div className="relative group">
+                                        <Target className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={18} />
+                                        <input
+                                            type="text"
+                                            name="secondary_skills"
+                                            value={formData.secondary_skills || ''}
+                                            onChange={handleInputChange}
+                                            disabled={!isEditing}
+                                            placeholder="e.g. Project Management, AWS, SQL"
+                                            className="w-full bg-slate-800/40 border border-slate-700/50 rounded-2xl py-3.5 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40 disabled:opacity-50 transition-all font-medium"
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
                         <div className="flex gap-4 pt-6">
                             {!isEditing ? (

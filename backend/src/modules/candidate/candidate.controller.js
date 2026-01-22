@@ -1,4 +1,5 @@
 import * as candidateService from './candidate.service.js';
+import * as recommendationService from '../job/recommendation.service.js';
 import AppError from '../../utils/AppError.js';
 
 export const createProfile = async (req, res, next) => {
@@ -40,6 +41,9 @@ export const updateProfile = async (req, res, next) => {
         if (!updatedProfile) {
             return next(new AppError('Profile not found', 404));
         }
+
+        // Clear AI recommendation cache so new recommendations match updated profile
+        recommendationService.clearRecommendationCache(userId);
 
         res.json({ status: 'success', data: updatedProfile });
     } catch (error) {
