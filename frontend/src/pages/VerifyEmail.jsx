@@ -1,60 +1,50 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import toast from 'react-hot-toast';
 
 const VerifyEmail = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
     const { verifyEmail } = useAuth();
-    const [status, setStatus] = useState('verifying'); // verifying, success, error
+    const navigate = useNavigate();
+    const [status, setStatus] = useState('Verifying...');
+    const [error, setError] = useState(false);
 
     useEffect(() => {
         if (!token) {
-            setStatus('error');
+            setStatus('Invalid verification link.');
+            setError(true);
             return;
         }
-        verifyEmail(token)
-            .then(() => {
-                setStatus('success');
-                toast.success('Email verified successfully!');
-            })
-            .catch((err) => {
-                console.error(err);
-                setStatus('error');
-                toast.error('Verification failed. Token may be invalid or expired.');
-            });
-    }, [token]);
+
+        const verify = async () => {
+            try {
+                await verifyEmail(token);
+                setStatus('Email verified successfully! Redirecting...');
+                setTimeout(() => navigate('/login'), 2000);
+            } catch (err) {
+                setStatus(err.toString());
+                setError(true);
+            }
+        };
+
+        verify();
+    }, [token, verifyEmail, navigate]);
 
     return (
-        <div className="auth-container">
-            <div className="auth-card glass-panel" style={{ textAlign: 'center' }}>
-                {status === 'verifying' && <h2>Verifying...</h2>}
-                {status === 'success' && (
-                    <>
-                        <h2 style={{ color: 'var(--success)' }}>Email Verified!</h2>
-                        <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>
-                            Your account is now active.
-                        </p>
-                        <div style={{ marginTop: '2rem' }}>
-                            <Link to="/login" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>
-                                Proceed to Login
-                            </Link>
-                        </div>
-                    </>
-                )}
-                {status === 'error' && (
-                    <>
-                        <h2 style={{ color: 'var(--error)' }}>Verification Failed</h2>
-                        <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>
-                            The link may be broken or expired.
-                        </p>
-                        <div style={{ marginTop: '2rem' }}>
-                            <Link to="/signup" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>
-                                Back to Signup
-                            </Link>
-                        </div>
-                    </>
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+            <div className="bg-slate-800 p-8 rounded-xl border border-slate-700 shadow-xl max-w-sm w-full text-center">
+                <h2 className="text-2xl font-bold text-white mb-4">Email Verification</h2>
+                <p className={`text-lg ${error ? 'text-red-400' : 'text-green-400'}`}>
+                    {status}
+                </p>
+                {error && (
+                    <button
+                        onClick={() => navigate('/login')}
+                        className="mt-6 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                    >
+                        Return to Login
+                    </button>
                 )}
             </div>
         </div>

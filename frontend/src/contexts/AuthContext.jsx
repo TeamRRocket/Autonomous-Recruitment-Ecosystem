@@ -6,28 +6,49 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
+    const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const decoded = jwtDecode(token);
-                // Ideally fetch full user profile here, but for now use decoded token
-                // Or store user details in localStorage too (less secure for details but okay for name)
-                // Let's assume we decode role and id from token.
-                // If the token is expired, jwtDecode might throw or returning expired.
-                if (decoded.exp * 1000 < Date.now()) {
-                    logout();
-                } else {
-                    setUser(decoded);
-                }
-            } catch (error) {
-                console.error("Invalid token", error);
-                logout();
+    const fetchProfile = async (role) => {
+        try {
+            let data;
+            if (role === 'CANDIDATE') {
+                const { getCandidateProfile } = await import('../services/candidateService');
+                const res = await getCandidateProfile();
+                data = res.data;
+            } else if (role === 'RECRUITER') {
+                const { getRecruiterProfile } = await import('../services/recruiterService');
+                const res = await getRecruiterProfile();
+                data = res.data;
             }
+            setProfile(data);
+        } catch (error) {
+            console.log('Profile not found or error fetching profile:', error);
+            setProfile(null);
         }
-        setLoading(false);
+    };
+
+    useEffect(() => {
+        const initAuth = async () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const decoded = jwtDecode(token);
+                    if (decoded.exp * 1000 < Date.now()) {
+                        logout();
+                    } else {
+                        setUser(decoded);
+                        await fetchProfile(decoded.role);
+                    }
+                } catch (error) {
+                    console.error("Invalid token", error);
+                    logout();
+                }
+            }
+            setLoading(false);
+        };
+
+        initAuth();
     }, []);
 
     const login = async (email, password) => {
@@ -35,7 +56,9 @@ export const AuthProvider = ({ children }) => {
             const response = await api.post('/auth/login', { email, password });
             const { token, data } = response.data;
             localStorage.setItem('token', token);
-            setUser(jwtDecode(token)); // Or use data.user
+            const decoded = jwtDecode(token);
+            setUser(decoded);
+            await fetchProfile(decoded.role);
             return data;
         } catch (error) {
             throw error.response?.data?.message || 'Login failed';
@@ -65,7 +88,9 @@ export const AuthProvider = ({ children }) => {
             const response = await api.post('/auth/google', { idToken, role });
             const { token, data } = response.data;
             localStorage.setItem('token', token);
-            setUser(jwtDecode(token));
+            const decoded = jwtDecode(token);
+            setUser(decoded);
+            await fetchProfile(decoded.role);
             return data;
         } catch (error) {
             throw error.response?.data?.message || 'Google Login failed';
@@ -84,10 +109,11 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         localStorage.removeItem('token');
         setUser(null);
+        setProfile(null);
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, signup, verifyEmail, googleLogin, setPassword, logout, loading }}>
+        <AuthContext.Provider value={{ user, profile, setProfile, fetchProfile, login, signup, verifyEmail, googleLogin, setPassword, logout, loading }}>
             {!loading && children}
         </AuthContext.Provider>
     );

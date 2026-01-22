@@ -22,13 +22,27 @@ pool.query('SELECT NOW()', (err, res) => {
 });
 
 import authRoutes from './modules/auth/auth.routes.js';
+import candidateRoutes from './modules/candidate/candidate.routes.js';
+import recruiterRoutes from './modules/recruiter/recruiter.routes.js';
+import jobRoutes from './modules/job/job.routes.js';
+import applicationRoutes from './modules/application/application.routes.js';
+import roundRoutes from './modules/round/round.routes.js';
 import errorHandler from './middleware/errorHandler.js';
 import AppError from './utils/AppError.js';
+import path from 'path';
 
 // ... (previous code above)
 
 // Routes
 app.use('/auth', authRoutes);
+app.use('/api/candidates', candidateRoutes);
+app.use('/api/recruiters', recruiterRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use('/api/applications', applicationRoutes);
+app.use('/api/rounds', roundRoutes);
+
+// Serve uploaded files
+app.use('/uploads/resumes', express.static(path.join(process.cwd(), 'uploads', 'resumes')));
 
 // Health Check
 app.get('/health', (req, res) => {

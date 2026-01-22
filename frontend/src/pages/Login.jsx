@@ -17,7 +17,7 @@ const Login = () => {
             toast.success('Login success!');
             navigate('/');
         } catch (error) {
-            toast.error(error);
+            toast.error(error.toString());
         }
     };
 
@@ -36,49 +36,64 @@ const Login = () => {
     };
 
     return (
-        <div className="auth-container">
-            <div className="auth-card glass-panel">
-                <h2 style={{ textAlign: 'center', marginBottom: '2rem', fontSize: '2rem' }}>Welcome Back</h2>
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0f172a] to-black flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl overflow-hidden p-8">
+                <div className="text-center mb-8">
+                    <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400">Welcome Back</h2>
+                    <p className="text-slate-400 mt-2">Sign in to your account</p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Email</label>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
                         <input
                             type="email"
-                            className="input-field"
+                            className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            placeholder="you@gmail.com"
+                            placeholder="you@company.com"
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Password</label>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
                         <input
                             type="password"
-                            className="input-field"
+                            className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
                             placeholder="••••••••"
                         />
                     </div>
-                    <button type="submit" className="btn-primary" style={{ marginTop: '1rem' }}>
+
+                    <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2.5 rounded-lg transition-all transform hover:scale-[1.02] shadow-lg shadow-blue-500/20">
                         Sign In
                     </button>
 
-                    <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center' }}>
+                    <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-slate-700"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-2 bg-slate-800 text-slate-400">Or continue with</span>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-center">
                         <GoogleLogin
                             onSuccess={handleGoogleSuccess}
                             onError={handleGoogleError}
-                            theme="outline"
+                            theme="filled_black"
+                            shape="circle"
                             size="large"
                             width="280"
                         />
                     </div>
                 </form>
 
-                <div style={{ marginTop: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <p>Don't have an account? <Link to="/signup" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>Sign up</Link></p>
+                <div className="mt-8 text-center text-sm text-slate-400">
+                    <p>Don't have an account? <Link to="/signup" className="text-blue-400 hover:text-blue-300 font-medium">Sign up</Link></p>
                 </div>
             </div>
         </div>
