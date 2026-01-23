@@ -6,28 +6,26 @@ export const createCandidateProfile = async (userId, profileData) => {
         years_of_experience,
         primary_skills,
         secondary_skills,
-        skill_levels,
+        skill_levels = null,
         preferred_roles,
-        preferred_locations,
-        resume_url
+        preferred_locations
     } = profileData;
 
     const result = await pool.query(
         `INSERT INTO candidate_profiles (
       user_id, full_name, years_of_experience, primary_skills, secondary_skills, 
-      skill_levels, preferred_roles, preferred_locations, resume_url
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+      skill_levels, preferred_roles, preferred_locations
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
     RETURNING *`,
         [
             userId,
             full_name,
-            years_of_experience,
-            primary_skills,
-            secondary_skills,
+            years_of_experience || 0,
+            primary_skills || [],
+            secondary_skills || [],
             skill_levels,
-            preferred_roles,
-            preferred_locations,
-            resume_url
+            preferred_roles || [],
+            preferred_locations || []
         ]
     );
     return result.rows[0];
@@ -50,10 +48,9 @@ export const updateCandidateProfile = async (userId, profileData) => {
         years_of_experience,
         primary_skills,
         secondary_skills,
-        skill_levels,
+        skill_levels = null,
         preferred_roles,
-        preferred_locations,
-        resume_url
+        preferred_locations
     } = profileData;
 
     const result = await pool.query(
@@ -65,7 +62,6 @@ export const updateCandidateProfile = async (userId, profileData) => {
          skill_levels = COALESCE($6, skill_levels),
          preferred_roles = COALESCE($7, preferred_roles),
          preferred_locations = COALESCE($8, preferred_locations),
-         resume_url = COALESCE($9, resume_url),
          updated_at = CURRENT_TIMESTAMP
      WHERE user_id = $1
      RETURNING *`,
@@ -77,8 +73,7 @@ export const updateCandidateProfile = async (userId, profileData) => {
             secondary_skills,
             skill_levels,
             preferred_roles,
-            preferred_locations,
-            resume_url
+            preferred_locations
         ]
     );
     return result.rows[0];

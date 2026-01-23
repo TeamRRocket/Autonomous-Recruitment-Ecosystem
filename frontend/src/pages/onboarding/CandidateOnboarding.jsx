@@ -20,8 +20,7 @@ const CandidateOnboarding = () => {
         primary_skills: '',
         secondary_skills: '',
         preferred_roles: '',
-        preferred_locations: '',
-        resume_url: ''
+        preferred_locations: ''
     });
 
     const handleChange = (e) => {
@@ -96,7 +95,6 @@ const CandidateOnboarding = () => {
                         <div className="space-y-6 animate-fadeIn">
                             <InputGroup label="Preferred Roles" name="preferred_roles" placeholder="Senior Developer, Tech Lead" value={formData.preferred_roles} onChange={handleChange} />
                             <InputGroup label="Preferred Locations" name="preferred_locations" placeholder="Remote, New York" value={formData.preferred_locations} onChange={handleChange} />
-                            <InputGroup label="Resume URL (PDF)" name="resume_url" placeholder="https://..." value={formData.resume_url} onChange={handleChange} />
                         </div>
                     )}
 

@@ -9,16 +9,33 @@ const SetPassword = () => {
     const { setPassword: setAuthPassword, logout } = useAuth();
     const navigate = useNavigate();
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const validate = () => {
         if (password !== confirmPassword) {
             toast.error("Passwords do not match");
-            return;
+            return false;
         }
-        if (password.length < 6) {
-            toast.error("Password must be at least 6 characters");
-            return;
+        if (password.length < 8) {
+            toast.error("Password must be at least 8 characters");
+            return false;
         }
+        if (!/\d/.test(password)) {
+            toast.error("Password must contain at least one number");
+            return false;
+        }
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+            toast.error("Password must contain at least one special character");
+            return false;
+        }
+        if (!/[A-Z]/.test(password)) {
+            toast.error("Password must contain at least one capital letter");
+            return false;
+        }
+        return true;
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!validate()) return;
 
         try {
             await setAuthPassword(password);
@@ -29,6 +46,13 @@ const SetPassword = () => {
             toast.error(String(error));
         }
     };
+
+    const requirements = [
+        { label: 'At least 8 characters', met: password.length >= 8 },
+        { label: 'One number', met: /\d/.test(password) },
+        { label: 'One special character', met: /[!@#$%^&*(),.?":{}|<>]/.test(password) },
+        { label: 'One capital letter', met: /[A-Z]/.test(password) },
+    ];
 
     return (
         <div className="auth-container">
@@ -59,6 +83,23 @@ const SetPassword = () => {
                             required
                             placeholder="••••••••"
                         />
+                    </div>
+                    <div style={{ marginTop: '0.5rem' }}>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Password Requirements:</p>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                            {requirements.map((req, index) => (
+                                <li key={index} style={{
+                                    fontSize: '0.8rem',
+                                    color: req.met ? '#10b981' : 'var(--text-secondary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    transition: 'color 0.2s'
+                                }}>
+                                    {req.met ? '✓' : '○'} {req.label}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                     <button type="submit" className="btn-primary" style={{ marginTop: '1rem' }}>
                         Set Password

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import authRepository from './auth.repository.js';
-import { hashPassword, comparePassword } from '../../utils/password.js';
+import { hashPassword, comparePassword, validatePassword } from '../../utils/password.js';
 import { signToken } from '../../utils/jwt.js';
 import sendEmail from '../../utils/email.js';
 import AppError from '../../utils/AppError.js';
@@ -18,6 +18,11 @@ class AuthService {
         const existingUser = await authRepository.findUserByEmail(email);
         if (existingUser) {
             throw new AppError('Email already exists', 400);
+        }
+
+        const validationError = validatePassword(password);
+        if (validationError) {
+            throw new AppError(validationError, 400);
         }
 
         const passwordHash = await hashPassword(password);
@@ -128,6 +133,11 @@ class AuthService {
     }
 
     async setPassword(userId, password) {
+        const validationError = validatePassword(password);
+        if (validationError) {
+            throw new AppError(validationError, 400);
+        }
+
         const passwordHash = await hashPassword(password);
         await authRepository.updateUserPassword(userId, passwordHash);
         return { message: 'Password set successfully' };
