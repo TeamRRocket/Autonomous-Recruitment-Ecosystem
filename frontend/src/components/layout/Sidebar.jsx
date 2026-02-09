@@ -30,6 +30,8 @@ const Sidebar = () => {
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Create Job', path: '/jobs/new', icon: Briefcase },
         { name: 'Applications', path: '/applications', icon: Users },
+        { name: 'Rank Candidates', path: '/recruiter/rank-candidates', icon: CheckCircle2 },
+        { name: 'DSA Builder', path: '/recruiter/dsa-builder', icon: FileText },
     ];
 
     const links = role === 'RECRUITER' ? recruiterLinks : candidateLinks;

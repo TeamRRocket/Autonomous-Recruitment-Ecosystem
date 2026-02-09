@@ -2,8 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { pool } from './config/db.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Always load backend/.env (works even if process is started from repo root)
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,9 +39,12 @@ import recruiterRoutes from './modules/recruiter/recruiter.routes.js';
 import jobRoutes from './modules/job/job.routes.js';
 import applicationRoutes from './modules/application/application.routes.js';
 import roundRoutes from './modules/round/round.routes.js';
+import codingRoutes from './modules/coding/coding.routes.js';
+import dsaRoutes from './modules/dsa/dsa.routes.js';
+import resumeRoutes from './routes/resume.routes.js';
+import aiRoutes from './routes/ai.routes.js';
 import errorHandler from './middleware/errorHandler.js';
 import AppError from './utils/AppError.js';
-import path from 'path';
 
 // ... (previous code above)
 
@@ -46,6 +55,10 @@ app.use('/api/recruiters', recruiterRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/rounds', roundRoutes);
+app.use('/api/coding', codingRoutes);
+app.use('/api/dsa', dsaRoutes);
+app.use('/api/resume', resumeRoutes);
+app.use('/api/recruiter', aiRoutes);
 
 // Serve uploaded files
 app.use('/uploads/resumes', express.static(path.join(process.cwd(), 'uploads', 'resumes')));

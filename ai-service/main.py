@@ -11,6 +11,13 @@ load_dotenv()
 
 app = FastAPI(title="HireFlow AI - Hybrid Matching Service")
 
+try:
+    from ai.api.resume_routes import router as resume_router
+    app.include_router(resume_router, prefix="/ai/resume", tags=["resume"])
+except Exception as exc:
+    # Keep existing APIs running even if resume module dependencies are missing.
+    print(f"Resume router failed to load: {exc}")
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 

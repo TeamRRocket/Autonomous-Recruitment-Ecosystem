@@ -3,6 +3,7 @@ import { ChevronUp, ChevronDown, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AVAILABLE_ROUNDS = [
+    { id: 'resume', name: 'Resume Screening', type: 'INTERVIEW' },
     { id: 'aptitude', name: 'Aptitude Round', type: 'MCQ' },
     { id: 'dsa', name: 'DSA Round', type: 'CODING' },
     { id: 'tech1', name: 'Technical Round – 1', type: 'INTERVIEW' },

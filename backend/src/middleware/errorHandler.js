@@ -3,7 +3,7 @@ const errorHandler = (err, req, res, next) => {
     err.status = err.status || 'error';
     console.error('Error in Request:', err);
 
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV !== 'production') {
         res.status(err.statusCode).json({
             status: err.status,
             error: err,
