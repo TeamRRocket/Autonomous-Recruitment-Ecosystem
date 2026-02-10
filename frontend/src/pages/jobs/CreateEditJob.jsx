@@ -16,7 +16,11 @@ const CreateEditJob = () => {
         location: '',
         type: 'Full-time',
         expires_at: '',
-        requirements: []
+        requirements: [],
+        aptitude_enabled: false,
+        aptitude_level: 'medium',
+        aptitude_duration_minutes: 20,
+        aptitude_question_count: 20
     });
     const [currentReq, setCurrentReq] = useState('');
     const [loading, setLoading] = useState(isEditMode);
@@ -44,7 +48,11 @@ const CreateEditJob = () => {
                 location: job.location,
                 type: job.type,
                 expires_at: formattedDate,
-                requirements: job.requirements || []
+                requirements: job.requirements || [],
+                aptitude_enabled: !!job.aptitude_enabled,
+                aptitude_level: job.aptitude_level || 'medium',
+                aptitude_duration_minutes: job.aptitude_duration_minutes ?? 20,
+                aptitude_question_count: job.aptitude_question_count ?? 20
             });
             setLoading(false);
         } catch (err) {
@@ -54,7 +62,12 @@ const CreateEditJob = () => {
     };
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value, type, checked } = e.target;
+        if (type === 'checkbox') {
+            setFormData({ ...formData, [name]: checked });
+            return;
+        }
+        setFormData({ ...formData, [name]: value });
     };
 
     const handleReqKeyDown = (e) => {
@@ -106,7 +119,11 @@ const CreateEditJob = () => {
                 location: formData.location || null,
                 type: formData.type || null,
                 requirements: formData.requirements,
-                expires_at: formData.expires_at || null
+                expires_at: formData.expires_at || null,
+                aptitude_enabled: !!formData.aptitude_enabled,
+                aptitude_level: formData.aptitude_enabled ? (formData.aptitude_level || 'medium') : null,
+                aptitude_duration_minutes: formData.aptitude_enabled ? parseInt(formData.aptitude_duration_minutes) : null,
+                aptitude_question_count: formData.aptitude_enabled ? parseInt(formData.aptitude_question_count) : null
             };
 
             if (isEditMode) {
@@ -233,6 +250,51 @@ const CreateEditJob = () => {
                                 value={formData.description}
                                 onChange={handleChange}
                             />
+
+                            <div className="border-t border-slate-700/60 pt-6">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <p className="text-white font-semibold">Aptitude Round (MCQ)</p>
+                                        <p className="text-xs text-slate-500">Enable and configure aptitude assessment for candidates.</p>
+                                    </div>
+                                    <label className="flex items-center gap-2 text-slate-300">
+                                        <input
+                                            type="checkbox"
+                                            name="aptitude_enabled"
+                                            checked={!!formData.aptitude_enabled}
+                                            onChange={handleChange}
+                                            className="h-4 w-4 rounded border-slate-600 bg-slate-900"
+                                        />
+                                        Enabled
+                                    </label>
+                                </div>
+
+                                <div className={`mt-4 grid grid-cols-1 md:grid-cols-3 gap-6 ${formData.aptitude_enabled ? '' : 'opacity-50'}`}>
+                                    <InputGroup
+                                        label="Difficulty"
+                                        name="aptitude_level"
+                                        options={['easy', 'medium', 'hard']}
+                                        value={formData.aptitude_level}
+                                        onChange={handleChange}
+                                    />
+                                    <InputGroup
+                                        label="Duration (mins)"
+                                        name="aptitude_duration_minutes"
+                                        type="number"
+                                        value={formData.aptitude_duration_minutes}
+                                        onChange={handleChange}
+                                        placeholder="e.g. 20"
+                                    />
+                                    <InputGroup
+                                        label="Question Count"
+                                        name="aptitude_question_count"
+                                        type="number"
+                                        value={formData.aptitude_question_count}
+                                        onChange={handleChange}
+                                        placeholder="e.g. 20"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <div className="pt-4 flex gap-4">

@@ -22,6 +22,7 @@ router.post('/', restrictTo('RECRUITER'), jobController.createJob);
 router.get('/recruiter/my-jobs', restrictTo('RECRUITER'), jobController.getMyJobs);
 router.post('/:id/publish', restrictTo('RECRUITER'), requireOwnership, jobController.publishJob);
 router.get('/:id/overview', restrictTo('RECRUITER'), requireOwnership, jobController.getJobOverview);
+router.get('/:id/scores', restrictTo('RECRUITER'), requireOwnership, jobController.getJobScores);
 
 // Parameterized routes - Must come after specific routes
 router.get('/:id', jobController.getJob);

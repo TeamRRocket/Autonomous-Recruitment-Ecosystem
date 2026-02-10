@@ -22,6 +22,8 @@ import Recommendations from './pages/Recommendations';
 import RecruiterJobRanking from './pages/RecruiterJobRanking';
 import RecruiterCodingBuilder from './pages/coding/RecruiterCodingBuilder';
 import CandidateCodingRound from './pages/coding/CandidateCodingRound';
+import CandidateAptitudeRound from './pages/aptitude/CandidateAptitudeRound';
+import RecruiterScores from './pages/recruiter/RecruiterScores';
 import { useLocation } from 'react-router-dom';
 
 const ApplicationsPage = () => {
@@ -103,8 +105,10 @@ function App() {
               <Route path="/jobs/:id" element={<JobDetails />} />
               <Route path="/applications" element={<ApplicationsPage />} />
               <Route path="/recruiter/rank-candidates" element={<RecruiterJobRanking />} />
+              <Route path="/recruiter/scores" element={<RecruiterScores />} />
               <Route path="/recruiter/dsa-builder" element={<RecruiterCodingBuilder />} />
               <Route path="/coding/round/:roundId" element={<CandidateCodingRound />} />
+              <Route path="/aptitude/round/:jobId" element={<CandidateAptitudeRound />} />
               <Route path="/recommendations" element={<Recommendations />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Profile />} /> {/* Placeholder */}

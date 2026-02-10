@@ -39,6 +39,28 @@ const JobCreationWizard = () => {
     // Selected & Configured Rounds
     const [selectedRounds, setSelectedRounds] = useState([]);
 
+    const buildAptitudeConfig = (rounds) => {
+        const apt = (rounds || []).find(r => r?.id === 'aptitude');
+        if (!apt) {
+            return {
+                aptitude_enabled: false,
+                aptitude_level: null,
+                aptitude_duration_minutes: null,
+                aptitude_question_count: null
+            };
+        }
+
+        const level = (apt.difficulty_level || 'MEDIUM').toString().trim().toLowerCase();
+        const normalizedLevel = ['easy', 'medium', 'hard'].includes(level) ? level : 'medium';
+
+        return {
+            aptitude_enabled: true,
+            aptitude_level: normalizedLevel,
+            aptitude_duration_minutes: apt.duration_minutes ? parseInt(apt.duration_minutes) : 60,
+            aptitude_question_count: apt.num_questions ? parseInt(apt.num_questions) : 10
+        };
+    };
+
     const handleNext = async (stepData = null) => {
         let currentData = formData;
         if (stepData) {
@@ -69,10 +91,12 @@ const JobCreationWizard = () => {
     const handleSaveJobDraft = async (data = formData) => {
         setIsSaving(true);
         try {
+            const aptitudeCfg = buildAptitudeConfig(selectedRounds);
             const payload = {
                 ...data,
                 status: 'DRAFT',
-                requirements: data.responsibilities // Temporary mapping if needed by backend
+                requirements: data.responsibilities, // Temporary mapping if needed by backend
+                ...aptitudeCfg
             };
 
             if (jobId) {
@@ -107,6 +131,11 @@ const JobCreationWizard = () => {
             }));
 
             await saveRounds(jobId, roundsPayload);
+
+            // Persist aptitude config onto the job row (backend reads from jobs table for aptitude)
+            const aptitudeCfg = buildAptitudeConfig(selectedRounds);
+            await updateJob(jobId, aptitudeCfg);
+
             toast.success('Rounds configuration saved');
             return true;
         } catch (err) {

@@ -101,6 +101,63 @@ const createTables = async () => {
         `);
         console.log('Jobs table checked/created.');
 
+        // Aptitude round configuration on Job (schema evolution-safe)
+        await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS aptitude_enabled BOOLEAN NOT NULL DEFAULT FALSE;`);
+        await client.query(
+            `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS aptitude_level VARCHAR(16) CHECK (aptitude_level IN ('easy', 'medium', 'hard'));`
+        );
+        await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS aptitude_duration_minutes INTEGER;`);
+        await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS aptitude_question_count INTEGER;`);
+        console.log('Jobs aptitude config columns checked/created.');
+
+        // Aptitude Questions Bank
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS aptitude_questions (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                question_text TEXT NOT NULL,
+                option_a TEXT NOT NULL,
+                option_b TEXT NOT NULL,
+                option_c TEXT NOT NULL,
+                option_d TEXT NOT NULL,
+                correct_option VARCHAR(1) NOT NULL CHECK (correct_option IN ('A','B','C','D')),
+                difficulty VARCHAR(16) NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
+                topic VARCHAR(128),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log('Aptitude questions table checked/created.');
+
+        // Candidate Aptitude Attempt
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS candidate_aptitude_attempts (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                candidate_id UUID NOT NULL REFERENCES candidate_profiles(id) ON DELETE CASCADE,
+                job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                submitted_at TIMESTAMP WITH TIME ZONE,
+                score INTEGER,
+                status VARCHAR(16) NOT NULL CHECK (status IN ('started','submitted','expired')),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(job_id, candidate_id)
+            );
+        `);
+        console.log('Candidate aptitude attempts table checked/created.');
+
+        // Candidate Aptitude Responses (also used to lock questions at start by inserting rows with NULL selected_option)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS candidate_aptitude_responses (
+                attempt_id UUID NOT NULL REFERENCES candidate_aptitude_attempts(id) ON DELETE CASCADE,
+                question_id UUID NOT NULL REFERENCES aptitude_questions(id) ON DELETE RESTRICT,
+                selected_option VARCHAR(1) CHECK (selected_option IN ('A','B','C','D')),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (attempt_id, question_id)
+            );
+        `);
+        console.log('Candidate aptitude responses table checked/created.');
+
         // Create Interview Rounds Table
         await client.query(`
             CREATE TABLE IF NOT EXISTS interview_rounds (
@@ -375,11 +432,22 @@ const createTables = async () => {
         await client.query(`
             CREATE INDEX IF NOT EXISTS idx_dsa_round_submissions_attempt_id ON dsa_round_submissions(attempt_id);
         `);
+
         await client.query(`
             CREATE INDEX IF NOT EXISTS idx_dsa_round_run_logs_attempt_id ON dsa_round_run_logs(attempt_id);
         `);
         await client.query(`
             CREATE INDEX IF NOT EXISTS idx_dsa_round_anti_cheat_events_attempt_id ON dsa_round_anti_cheat_events(attempt_id);
+        `);
+
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_aptitude_questions_difficulty ON aptitude_questions(difficulty);
+        `);
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_candidate_aptitude_attempts_job_candidate ON candidate_aptitude_attempts(job_id, candidate_id);
+        `);
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_candidate_aptitude_responses_attempt_id ON candidate_aptitude_responses(attempt_id);
         `);
 
         console.log('Database initialization completed successfully.');

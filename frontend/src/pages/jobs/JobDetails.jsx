@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getJobById } from '../../services/jobService';
 import { applyToJob, checkApplication, getApplicationsByJob, updateApplicationStatus } from '../../services/applicationService';
 import { getRounds } from '../../services/roundService';
+import { getAptitudeStatus } from '../../services/aptitudeService';
+import { getJobScores } from '../../services/jobScoresService';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -18,6 +20,9 @@ const JobDetails = () => {
     const [isApplying, setIsApplying] = useState(false);
     const [resumeFile, setResumeFile] = useState(null);
     const [rounds, setRounds] = useState([]);
+    const [aptitudeStatus, setAptitudeStatus] = useState(null);
+    const [scores, setScores] = useState(null);
+    const [scoresLoading, setScoresLoading] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -52,6 +57,25 @@ const JobDetails = () => {
     }, [id, user]);
 
     useEffect(() => {
+        const fetchScores = async () => {
+            if (!user || user.role !== 'RECRUITER') return;
+            if (!id) return;
+
+            setScoresLoading(true);
+            try {
+                const res = await getJobScores(id);
+                setScores(res.data);
+            } catch (err) {
+                setScores(null);
+            } finally {
+                setScoresLoading(false);
+            }
+        };
+
+        fetchScores();
+    }, [id, user]);
+
+    useEffect(() => {
         const fetchRounds = async () => {
             if (!user || user.role !== 'CANDIDATE') return;
             if (!job || job.status !== 'PUBLISHED') return;
@@ -66,6 +90,25 @@ const JobDetails = () => {
         };
 
         fetchRounds();
+    }, [id, user, job, hasApplied]);
+
+    useEffect(() => {
+        const fetchAptitudeStatus = async () => {
+            if (!user || user.role !== 'CANDIDATE') return;
+            if (!job || job.status !== 'PUBLISHED') return;
+            if (!hasApplied) return;
+            if (!job?.aptitude_enabled) return;
+
+            try {
+                const res = await getAptitudeStatus(id);
+                setAptitudeStatus(res.data);
+            } catch (err) {
+                // Non-blocking; still allow start attempt (backend enforces one attempt)
+                setAptitudeStatus(null);
+            }
+        };
+
+        fetchAptitudeStatus();
     }, [id, user, job, hasApplied]);
 
     const handleApply = async () => {
@@ -234,10 +277,31 @@ const JobDetails = () => {
                                         <p className="text-green-400 font-medium">✓ You have already applied to this job</p>
                                     </div>
 
-                                    {rounds.filter(r => r.round_type === 'CODING').length > 0 && (
+                                    {(job?.aptitude_enabled || rounds.filter(r => r.round_type === 'CODING').length > 0) && (
                                         <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-4">
                                             <h4 className="text-white font-semibold mb-3">Assessments</h4>
                                             <div className="space-y-2">
+                                                {job?.aptitude_enabled && (
+                                                    <div className="flex items-center justify-between gap-3 bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3">
+                                                        <div>
+                                                            <p className="text-white font-semibold">Aptitude Round</p>
+                                                            <p className="text-xs text-slate-500 uppercase tracking-widest">
+                                                                MCQ / {job.aptitude_level || 'LEVEL'} / {job.aptitude_duration_minutes || '--'} min
+                                                            </p>
+                                                        </div>
+                                                        <button
+                                                            disabled={!!aptitudeStatus?.exists}
+                                                            onClick={() => navigate(`/aptitude/round/${id}`)}
+                                                            className={`px-4 py-2 rounded-lg text-sm font-semibold ${
+                                                                aptitudeStatus?.exists
+                                                                    ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
+                                                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                                                            }`}
+                                                        >
+                                                            {aptitudeStatus?.exists ? `Aptitude ${aptitudeStatus?.status || ''}` : 'Start Aptitude Round'}
+                                                        </button>
+                                                    </div>
+                                                )}
                                                 {rounds.filter(r => r.round_type === 'CODING').map((r) => (
                                                     <div key={r.id} className="flex items-center justify-between gap-3 bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3">
                                                         <div>
@@ -294,6 +358,54 @@ const JobDetails = () => {
 
                     {isRecruiter && (
                         <div className="px-8 py-6 bg-slate-900/50 border-t border-slate-700">
+                            <div className="mb-8">
+                                <h3 className="text-lg font-semibold text-white mb-4">Scores</h3>
+
+                                {scoresLoading && (
+                                    <p className="text-slate-400">Loading scores...</p>
+                                )}
+
+                                {!scoresLoading && (!scores?.candidates || scores.candidates.length === 0) && (
+                                    <p className="text-slate-400">No candidates yet to display scores.</p>
+                                )}
+
+                                {!scoresLoading && (scores?.candidates || []).length > 0 && (
+                                    <div className="space-y-3">
+                                        {(scores?.candidates || []).map((row) => (
+                                            <div key={row.candidate.id} className="bg-slate-800/40 border border-slate-700 rounded-lg p-4">
+                                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                                    <div>
+                                                        <p className="text-white font-semibold">{row.candidate.name}</p>
+                                                        <p className="text-xs text-slate-500 uppercase tracking-widest">{row.application.status}</p>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                                        <div className="bg-slate-900/50 border border-slate-700 rounded-md px-3 py-2">
+                                                            <p className="text-xs text-slate-500">Resume</p>
+                                                            <p className="text-white font-semibold">{row.scores.resume.score ?? '--'}</p>
+                                                        </div>
+                                                        <div className="bg-slate-900/50 border border-slate-700 rounded-md px-3 py-2">
+                                                            <p className="text-xs text-slate-500">Aptitude</p>
+                                                            <p className="text-white font-semibold">{row.scores.aptitude.score ?? '--'}</p>
+                                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">{row.scores.aptitude.status}</p>
+                                                        </div>
+                                                        <div className="bg-slate-900/50 border border-slate-700 rounded-md px-3 py-2">
+                                                            <p className="text-xs text-slate-500">DSA</p>
+                                                            <p className="text-white font-semibold">{row.scores.dsa.score ?? '--'}</p>
+                                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">{row.scores.dsa.status}</p>
+                                                        </div>
+                                                        <div className="bg-slate-900/50 border border-slate-700 rounded-md px-3 py-2">
+                                                            <p className="text-xs text-slate-500">Coding</p>
+                                                            <p className="text-white font-semibold">{row.scores.coding.avg_score_percent ?? '--'}{row.scores.coding.avg_score_percent != null ? '%' : ''}</p>
+                                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">{(row.scores.coding.rounds || []).length} rounds</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             <h3 className="text-lg font-semibold text-white mb-4">Applicants ({applications.length})</h3>
                             {applications.length === 0 ? (
                                 <p className="text-slate-400">No applicants yet for this job.</p>

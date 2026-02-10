@@ -214,3 +214,10 @@ export const getJobOverview = catchAsync(async (req, res, next) => {
         data: jobWithRounds
     });
 });
+
+// Recruiter: Get Job Scores (all candidates + all rounds)
+export const getJobScores = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const data = await jobService.getJobScores(id);
+    res.json({ status: 'success', data });
+});
