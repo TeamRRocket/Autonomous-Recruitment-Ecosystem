@@ -61,6 +61,12 @@ const JobCreationWizard = () => {
         };
     };
 
+    const buildPipelineConfig = (rounds) => {
+        // No-gap pipeline: if aptitude is selected, default it as first; otherwise DSA.
+        const hasApt = (rounds || []).some(r => r?.id === 'aptitude');
+        return { pipeline_first_round: hasApt ? 'APTITUDE' : 'DSA' };
+    };
+
     const handleNext = async (stepData = null) => {
         let currentData = formData;
         if (stepData) {
@@ -92,11 +98,14 @@ const JobCreationWizard = () => {
         setIsSaving(true);
         try {
             const aptitudeCfg = buildAptitudeConfig(selectedRounds);
+            const pipelineCfg = buildPipelineConfig(selectedRounds);
             const payload = {
                 ...data,
                 status: 'DRAFT',
                 requirements: data.responsibilities, // Temporary mapping if needed by backend
                 ...aptitudeCfg
+                ,
+                ...pipelineCfg
             };
 
             if (jobId) {
@@ -134,7 +143,8 @@ const JobCreationWizard = () => {
 
             // Persist aptitude config onto the job row (backend reads from jobs table for aptitude)
             const aptitudeCfg = buildAptitudeConfig(selectedRounds);
-            await updateJob(jobId, aptitudeCfg);
+            const pipelineCfg = buildPipelineConfig(selectedRounds);
+            await updateJob(jobId, { ...aptitudeCfg, ...pipelineCfg });
 
             toast.success('Rounds configuration saved');
             return true;

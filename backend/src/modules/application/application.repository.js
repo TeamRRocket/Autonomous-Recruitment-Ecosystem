@@ -81,9 +81,17 @@ class ApplicationRepository {
                     j.title as job_title, 
                     j.location,
                     j.status as job_status,
+                    j.selection_lock_from,
+                    j.selection_lock_until,
+                    caa.status as aptitude_attempt_status,
+                    dra.status as dsa_attempt_status,
                     j.created_at as job_created_at
              FROM applications a
              JOIN jobs j ON a.job_id = j.id
+             LEFT JOIN candidate_aptitude_attempts caa
+               ON caa.job_id = a.job_id AND caa.candidate_id = a.candidate_id
+             LEFT JOIN dsa_round_attempts dra
+               ON dra.job_id = a.job_id AND dra.candidate_id = a.candidate_id
              WHERE a.candidate_id = $1
              ORDER BY a.created_at DESC`,
             [candidateId]

@@ -23,6 +23,30 @@ const getCandidateIdByUserId = async (userId) => {
   return result.rows[0].id;
 };
 
+const assertCodingUnlockedByPipeline = async (roundId, candidateId) => {
+  const round = await assertCodingRound(roundId);
+
+  const jobRes = await pool.query('SELECT pipeline_first_round FROM jobs WHERE id = $1', [round.job_id]);
+  const first = jobRes.rows[0]?.pipeline_first_round || 'APTITUDE';
+
+  // If CODING/DSA is first, allow it.
+  if (first !== 'APTITUDE') return;
+
+  const aptAttempt = await pool.query(
+    `SELECT status
+     FROM candidate_aptitude_attempts
+     WHERE job_id = $1 AND candidate_id = $2
+     LIMIT 1`,
+    [round.job_id, candidateId]
+  );
+
+  const st = (aptAttempt.rows[0]?.status || '').toString().toLowerCase();
+  const completed = st === 'submitted' || st === 'expired';
+  if (!completed) {
+    throw new AppError('Complete Aptitude round first to unlock DSA round', 403);
+  }
+};
+
 export const upsertProblem = async (roundId, recruiterUserId, payload) => {
   const round = await assertCodingRound(roundId);
 
@@ -171,8 +195,10 @@ export const getProblemForRecruiter = async (roundId, recruiterUserId) => {
   return { ...problem, test_cases: tcs.rows };
 };
 
-export const getProblemForCandidate = async (roundId) => {
+export const getProblemForCandidate = async (roundId, userId) => {
   await assertCodingRound(roundId);
+  const candidateId = await getCandidateIdByUserId(userId);
+  await assertCodingUnlockedByPipeline(roundId, candidateId);
 
   const problemRes = await pool.query('SELECT * FROM coding_problems WHERE round_id = $1', [roundId]);
   if (problemRes.rows.length === 0) {
@@ -205,7 +231,8 @@ export const getProblemForCandidate = async (roundId) => {
 
 export const runCode = async (roundId, userId, sourceCode, stdin) => {
   await assertCodingRound(roundId);
-  await getCandidateIdByUserId(userId);
+  const candidateId = await getCandidateIdByUserId(userId);
+  await assertCodingUnlockedByPipeline(roundId, candidateId);
 
   if (!sourceCode) {
     throw new AppError('source_code is required', 400);
@@ -304,6 +331,7 @@ const evaluateAgainstTestCases = async ({ sourceCode, testCases, timeLimitSecond
 export const submitCode = async (roundId, userId, sourceCode) => {
   await assertCodingRound(roundId);
   const candidateId = await getCandidateIdByUserId(userId);
+  await assertCodingUnlockedByPipeline(roundId, candidateId);
 
   if (!sourceCode) {
     throw new AppError('source_code is required', 400);

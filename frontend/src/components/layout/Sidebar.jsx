@@ -9,7 +9,6 @@ import {
     Settings,
     LogOut,
     Building2,
-    CheckCircle2,
     Sparkles,
     BarChart3
 } from 'lucide-react';
@@ -31,9 +30,7 @@ const Sidebar = () => {
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
         { name: 'Create Job', path: '/jobs/new', icon: Briefcase },
         { name: 'Applications', path: '/applications', icon: Users },
-        { name: 'Rank Candidates', path: '/recruiter/rank-candidates', icon: CheckCircle2 },
         { name: 'Candidate Scores', path: '/recruiter/scores', icon: BarChart3 },
-        { name: 'DSA Builder', path: '/recruiter/dsa-builder', icon: FileText },
     ];
 
     const links = role === 'RECRUITER' ? recruiterLinks : candidateLinks;

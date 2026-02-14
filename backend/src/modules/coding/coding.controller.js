@@ -12,7 +12,7 @@ export const getProblemForRecruiter = catchAsync(async (req, res) => {
 });
 
 export const getProblemForCandidate = catchAsync(async (req, res) => {
-  const data = await codingService.getProblemForCandidate(req.params.roundId);
+  const data = await codingService.getProblemForCandidate(req.params.roundId, req.user.id);
   res.json({ status: 'success', data });
 });
 

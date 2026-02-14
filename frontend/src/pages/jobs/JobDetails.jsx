@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getJobById } from '../../services/jobService';
-import { applyToJob, checkApplication, getApplicationsByJob, updateApplicationStatus } from '../../services/applicationService';
-import { getRounds } from '../../services/roundService';
-import { getAptitudeStatus } from '../../services/aptitudeService';
+import { applyToJob, checkApplication, getApplicationsByJob, getMyApplications, updateApplicationStatus } from '../../services/applicationService';
 import { getJobScores } from '../../services/jobScoresService';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -19,10 +17,9 @@ const JobDetails = () => {
     const [hasApplied, setHasApplied] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
     const [resumeFile, setResumeFile] = useState(null);
-    const [rounds, setRounds] = useState([]);
-    const [aptitudeStatus, setAptitudeStatus] = useState(null);
     const [scores, setScores] = useState(null);
     const [scoresLoading, setScoresLoading] = useState(false);
+    const [myApplication, setMyApplication] = useState(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -57,6 +54,28 @@ const JobDetails = () => {
     }, [id, user]);
 
     useEffect(() => {
+        const fetchMyApplication = async () => {
+            if (!user || user.role !== 'CANDIDATE') return;
+            if (!id) return;
+            if (!hasApplied) {
+                setMyApplication(null);
+                return;
+            }
+
+            try {
+                const res = await getMyApplications();
+                const list = res.data || [];
+                const app = list.find((a) => String(a.job_id) === String(id));
+                setMyApplication(app || null);
+            } catch (err) {
+                setMyApplication(null);
+            }
+        };
+
+        fetchMyApplication();
+    }, [id, user, hasApplied]);
+
+    useEffect(() => {
         const fetchScores = async () => {
             if (!user || user.role !== 'RECRUITER') return;
             if (!id) return;
@@ -74,42 +93,6 @@ const JobDetails = () => {
 
         fetchScores();
     }, [id, user]);
-
-    useEffect(() => {
-        const fetchRounds = async () => {
-            if (!user || user.role !== 'CANDIDATE') return;
-            if (!job || job.status !== 'PUBLISHED') return;
-            if (!hasApplied) return;
-
-            try {
-                const res = await getRounds(id);
-                setRounds(res.data || []);
-            } catch (err) {
-                console.error('Failed to fetch rounds', err);
-            }
-        };
-
-        fetchRounds();
-    }, [id, user, job, hasApplied]);
-
-    useEffect(() => {
-        const fetchAptitudeStatus = async () => {
-            if (!user || user.role !== 'CANDIDATE') return;
-            if (!job || job.status !== 'PUBLISHED') return;
-            if (!hasApplied) return;
-            if (!job?.aptitude_enabled) return;
-
-            try {
-                const res = await getAptitudeStatus(id);
-                setAptitudeStatus(res.data);
-            } catch (err) {
-                // Non-blocking; still allow start attempt (backend enforces one attempt)
-                setAptitudeStatus(null);
-            }
-        };
-
-        fetchAptitudeStatus();
-    }, [id, user, job, hasApplied]);
 
     const handleApply = async () => {
         if (!resumeFile && !hasApplied) {
@@ -276,49 +259,6 @@ const JobDetails = () => {
                                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
                                         <p className="text-green-400 font-medium">✓ You have already applied to this job</p>
                                     </div>
-
-                                    {(job?.aptitude_enabled || rounds.filter(r => r.round_type === 'CODING').length > 0) && (
-                                        <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-4">
-                                            <h4 className="text-white font-semibold mb-3">Assessments</h4>
-                                            <div className="space-y-2">
-                                                {job?.aptitude_enabled && (
-                                                    <div className="flex items-center justify-between gap-3 bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3">
-                                                        <div>
-                                                            <p className="text-white font-semibold">Aptitude Round</p>
-                                                            <p className="text-xs text-slate-500 uppercase tracking-widest">
-                                                                MCQ / {job.aptitude_level || 'LEVEL'} / {job.aptitude_duration_minutes || '--'} min
-                                                            </p>
-                                                        </div>
-                                                        <button
-                                                            disabled={!!aptitudeStatus?.exists}
-                                                            onClick={() => navigate(`/aptitude/round/${id}`)}
-                                                            className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-                                                                aptitudeStatus?.exists
-                                                                    ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
-                                                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                                                            }`}
-                                                        >
-                                                            {aptitudeStatus?.exists ? `Aptitude ${aptitudeStatus?.status || ''}` : 'Start Aptitude Round'}
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                {rounds.filter(r => r.round_type === 'CODING').map((r) => (
-                                                    <div key={r.id} className="flex items-center justify-between gap-3 bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3">
-                                                        <div>
-                                                            <p className="text-white font-semibold">{r.round_name}</p>
-                                                            <p className="text-xs text-slate-500 uppercase tracking-widest">DSA / CODING</p>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => navigate(`/coding/round/${r.id}`)}
-                                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold"
-                                                        >
-                                                            Start DSA Round
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-4">

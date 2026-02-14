@@ -1,9 +1,9 @@
 import axios from 'axios';
 import AppError from '../utils/AppError.js';
 
-const AI_SERVICE_URL = 'http://localhost:8000/ai/resume/rank';
+const AI_SERVICE_URL = 'http://localhost:8000/ai/resume/score';
 
-export const rankResumes = async (payload) => {
+export const scoreResume = async (payload) => {
   const config = {
     timeout: 60000,
   };

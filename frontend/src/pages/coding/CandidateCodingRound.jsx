@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import Editor from '@monaco-editor/react';
 import { getCodingProblemForCandidate, runCoding, submitCoding } from '../../services/codingService';
 
 const DEFAULT_CPP_TEMPLATE = `#include <bits/stdc++.h>
@@ -28,6 +29,9 @@ const CandidateCodingRound = () => {
   const [submitting, setSubmitting] = useState(false);
   const [runResult, setRunResult] = useState(null);
   const [submitResult, setSubmitResult] = useState(null);
+
+  const [editorFontSize, setEditorFontSize] = useState(13);
+  const [editorFullscreen, setEditorFullscreen] = useState(false);
 
   const [leftTab, setLeftTab] = useState('description');
   const [bottomTab, setBottomTab] = useState('testcase');
@@ -103,6 +107,65 @@ const CandidateCodingRound = () => {
     return <div className="p-8 text-slate-400">Problem not available.</div>;
   }
 
+  const editorPanel = (
+    <div className="h-full grid grid-rows-[40px_1fr] min-h-0">
+      <div className="flex items-center justify-between px-3 border-b border-slate-800 bg-slate-950/20">
+        <div className="text-xs text-slate-500">
+          Editor
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-slate-800 bg-slate-950/40 overflow-hidden">
+            <button
+              onClick={() => setEditorFontSize((s) => Math.max(11, s - 1))}
+              className="px-3 py-1 text-xs font-semibold text-slate-300 hover:text-slate-100 hover:bg-slate-800/60"
+              type="button"
+              aria-label="Decrease font size"
+            >
+              A-
+            </button>
+            <div className="px-2 py-1 text-xs text-slate-400 border-x border-slate-800 min-w-[40px] text-center">
+              {editorFontSize}
+            </div>
+            <button
+              onClick={() => setEditorFontSize((s) => Math.min(22, s + 1))}
+              className="px-3 py-1 text-xs font-semibold text-slate-300 hover:text-slate-100 hover:bg-slate-800/60"
+              type="button"
+              aria-label="Increase font size"
+            >
+              A+
+            </button>
+          </div>
+
+          <button
+            onClick={() => setEditorFullscreen((v) => !v)}
+            className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950/40 text-xs font-semibold text-slate-300 hover:text-slate-100 hover:bg-slate-800/60"
+            type="button"
+          >
+            {editorFullscreen ? 'Exit Full Screen' : 'Full Screen'}
+          </button>
+        </div>
+      </div>
+
+      <div className="min-h-0 p-3">
+        <div className="w-full h-full rounded-xl overflow-hidden border border-slate-800 bg-slate-950/60">
+          <Editor
+            theme="vs-dark"
+            defaultLanguage="cpp"
+            value={sourceCode}
+            onChange={(v) => setSourceCode(v ?? '')}
+            options={{
+              minimap: { enabled: false },
+              fontSize: editorFontSize,
+              scrollBeyondLastLine: false,
+              automaticLayout: true,
+              wordWrap: 'on',
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="w-full h-[calc(100vh-96px)] min-h-[720px] px-3 sm:px-4 lg:px-6 py-4">
       <div className="h-full rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
@@ -121,34 +184,37 @@ const CandidateCodingRound = () => {
 
         <div className="h-[calc(100%-3rem)] grid grid-cols-1 lg:grid-cols-2">
           <div className="min-h-0 border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-950/20">
-            <div className="h-11 flex items-center gap-1 px-3 border-b border-slate-800">
-              <button
-                onClick={() => setLeftTab('description')}
-                className={`px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
-                  leftTab === 'description' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Description
-              </button>
-              <button
-                onClick={() => setLeftTab('constraints')}
-                className={`px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
-                  leftTab === 'constraints' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Constraints
-              </button>
-              <button
-                onClick={() => setLeftTab('samples')}
-                className={`px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
-                  leftTab === 'samples' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Samples
-              </button>
-            </div>
+            <div className="h-full grid grid-cols-[132px_1fr]">
+              <div className="border-r border-slate-800 bg-slate-950/30 p-2">
+                <div className="space-y-1">
+                  <button
+                    onClick={() => setLeftTab('description')}
+                    className={`w-full text-left px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                      leftTab === 'description' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Description
+                  </button>
+                  <button
+                    onClick={() => setLeftTab('constraints')}
+                    className={`w-full text-left px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                      leftTab === 'constraints' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Constraints
+                  </button>
+                  <button
+                    onClick={() => setLeftTab('samples')}
+                    className={`w-full text-left px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                      leftTab === 'samples' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Samples
+                  </button>
+                </div>
+              </div>
 
-            <div className="h-[calc(100%-2.75rem)] overflow-auto p-4">
+              <div className="min-h-0 overflow-auto p-4">
               {leftTab === 'description' && (
                 <div className="space-y-4">
                   <pre className="whitespace-pre-wrap text-sm text-slate-200 leading-relaxed">{problem.statement}</pre>
@@ -201,18 +267,14 @@ const CandidateCodingRound = () => {
                   )}
                 </div>
               )}
+              </div>
             </div>
           </div>
 
           <div className="min-h-0 bg-slate-950/10">
             <div className="h-full grid grid-rows-[1fr_260px_56px]">
-              <div className="min-h-0 border-b border-slate-800 p-3">
-                <textarea
-                  value={sourceCode}
-                  onChange={(e) => setSourceCode(e.target.value)}
-                  className="w-full h-full rounded-xl bg-slate-950/60 border border-slate-800 p-3 text-xs font-mono text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                  spellCheck={false}
-                />
+              <div className="min-h-0 border-b border-slate-800">
+                {editorPanel}
               </div>
 
               <div className="min-h-0 border-b border-slate-800 bg-slate-950/20">
@@ -340,6 +402,14 @@ const CandidateCodingRound = () => {
           </div>
         </div>
       </div>
+
+      {editorFullscreen && (
+        <div className="fixed inset-0 z-50 bg-slate-950">
+          <div className="h-full w-full">
+            {editorPanel}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

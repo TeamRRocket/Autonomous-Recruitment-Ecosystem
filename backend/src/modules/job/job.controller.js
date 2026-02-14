@@ -1,5 +1,6 @@
 import * as jobService from './job.service.js';
 import * as recruiterService from '../recruiter/recruiter.service.js';
+import { selectTopCandidates } from './selection.service.js';
 import AppError from '../../utils/AppError.js';
 import catchAsync from '../../utils/catchAsync.js';
 
@@ -220,4 +221,34 @@ export const getJobScores = catchAsync(async (req, res) => {
     const { id } = req.params;
     const data = await jobService.getJobScores(id);
     res.json({ status: 'success', data });
+});
+
+export const selectTop = catchAsync(async (req, res, next) => {
+    const recruiterUserId = req.user.id;
+    const jobId = req.params.id;
+    const { top_n, next_round, date, time, duration, instructions, lock_from, lock_until } = req.body;
+
+    if (!top_n) {
+        return next(new AppError('top_n is required', 400));
+    }
+    if (!next_round) {
+        return next(new AppError('next_round is required', 400));
+    }
+
+    const result = await selectTopCandidates({
+        jobId,
+        recruiterUserId,
+        topN: top_n,
+        nextRound: String(next_round).toUpperCase(),
+        schedule: {
+            date,
+            time,
+            duration,
+            instructions,
+            lock_from,
+            lock_until
+        }
+    });
+
+    res.json({ status: 'success', data: result });
 });

@@ -19,10 +19,9 @@ import RecruiterApplications from './pages/applications/RecruiterApplications';
 import CandidateApplications from './pages/applications/CandidateApplications';
 import Profile from './pages/Profile';
 import Recommendations from './pages/Recommendations';
-import RecruiterJobRanking from './pages/RecruiterJobRanking';
-import RecruiterCodingBuilder from './pages/coding/RecruiterCodingBuilder';
 import CandidateCodingRound from './pages/coding/CandidateCodingRound';
 import CandidateAptitudeRound from './pages/aptitude/CandidateAptitudeRound';
+import CandidateDsaRound from './pages/coding/CandidateDsaRound';
 import RecruiterScores from './pages/recruiter/RecruiterScores';
 import { useLocation } from 'react-router-dom';
 
@@ -88,6 +87,22 @@ function App() {
               </ProtectedRoute>
             } />
 
+            <Route path="/aptitude/round/:jobId" element={
+              <ProtectedRoute>
+                <RequireProfile>
+                  <CandidateAptitudeRound />
+                </RequireProfile>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/dsa/round/:jobId" element={
+              <ProtectedRoute>
+                <RequireProfile>
+                  <CandidateDsaRound />
+                </RequireProfile>
+              </ProtectedRoute>
+            } />
+
             {/* Main Application Routes Wrapped in DashboardLayout */}
             <Route element={
               <ProtectedRoute>
@@ -104,11 +119,8 @@ function App() {
               <Route path="/jobs/:id/edit" element={<CreateEditJob />} />
               <Route path="/jobs/:id" element={<JobDetails />} />
               <Route path="/applications" element={<ApplicationsPage />} />
-              <Route path="/recruiter/rank-candidates" element={<RecruiterJobRanking />} />
               <Route path="/recruiter/scores" element={<RecruiterScores />} />
-              <Route path="/recruiter/dsa-builder" element={<RecruiterCodingBuilder />} />
               <Route path="/coding/round/:roundId" element={<CandidateCodingRound />} />
-              <Route path="/aptitude/round/:jobId" element={<CandidateAptitudeRound />} />
               <Route path="/recommendations" element={<Recommendations />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Profile />} /> {/* Placeholder */}

@@ -20,7 +20,8 @@ const CreateEditJob = () => {
         aptitude_enabled: false,
         aptitude_level: 'medium',
         aptitude_duration_minutes: 20,
-        aptitude_question_count: 20
+        aptitude_question_count: 20,
+        pipeline_first_round: 'APTITUDE'
     });
     const [currentReq, setCurrentReq] = useState('');
     const [loading, setLoading] = useState(isEditMode);
@@ -52,7 +53,8 @@ const CreateEditJob = () => {
                 aptitude_enabled: !!job.aptitude_enabled,
                 aptitude_level: job.aptitude_level || 'medium',
                 aptitude_duration_minutes: job.aptitude_duration_minutes ?? 20,
-                aptitude_question_count: job.aptitude_question_count ?? 20
+                aptitude_question_count: job.aptitude_question_count ?? 20,
+                pipeline_first_round: job.pipeline_first_round || 'APTITUDE'
             });
             setLoading(false);
         } catch (err) {
@@ -124,6 +126,8 @@ const CreateEditJob = () => {
                 aptitude_level: formData.aptitude_enabled ? (formData.aptitude_level || 'medium') : null,
                 aptitude_duration_minutes: formData.aptitude_enabled ? parseInt(formData.aptitude_duration_minutes) : null,
                 aptitude_question_count: formData.aptitude_enabled ? parseInt(formData.aptitude_question_count) : null
+                ,
+                pipeline_first_round: formData.pipeline_first_round || 'APTITUDE'
             };
 
             if (isEditMode) {
@@ -252,6 +256,20 @@ const CreateEditJob = () => {
                             />
 
                             <div className="border-t border-slate-700/60 pt-6">
+                                <div className="mb-6">
+                                    <p className="text-white font-semibold">Assessment Pipeline</p>
+                                    <p className="text-xs text-slate-500">Choose which assessment the candidate must take first (no gap).</p>
+                                    <div className="mt-3 max-w-xs">
+                                        <InputGroup
+                                            label="First Round"
+                                            name="pipeline_first_round"
+                                            options={['APTITUDE', 'DSA']}
+                                            value={formData.pipeline_first_round}
+                                            onChange={handleChange}
+                                        />
+                                    </div>
+                                </div>
+
                                 <div className="flex items-center justify-between gap-4">
                                     <div>
                                         <p className="text-white font-semibold">Aptitude Round (MCQ)</p>

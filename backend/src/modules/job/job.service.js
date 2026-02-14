@@ -1,5 +1,6 @@
 import { pool } from '../../config/db.js';
 import AppError from '../../utils/AppError.js';
+import { rankJobApplications } from '../resume/resumeRanking.service.js';
 
 export const createJob = async (jobData) => {
     const {
@@ -20,7 +21,8 @@ export const createJob = async (jobData) => {
         aptitude_enabled,
         aptitude_level,
         aptitude_duration_minutes,
-        aptitude_question_count
+        aptitude_question_count,
+        pipeline_first_round
     } = jobData;
 
     if (!title || !description) {
@@ -37,7 +39,8 @@ export const createJob = async (jobData) => {
       type, requirements, status, expires_at, department, 
       experience_level, responsibilities, degree, preferred_qualifications,
       aptitude_enabled, aptitude_level, aptitude_duration_minutes, aptitude_question_count
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      , pipeline_first_round
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
     RETURNING *`,
         [
             recruiter_id,
@@ -57,7 +60,8 @@ export const createJob = async (jobData) => {
             aptitude_enabled ?? false,
             aptitude_level || null,
             aptitude_duration_minutes ?? null,
-            aptitude_question_count ?? null
+            aptitude_question_count ?? null,
+            pipeline_first_round || 'APTITUDE'
         ]
     );
     const job = result.rows[0];
@@ -81,8 +85,15 @@ export const updateJob = async (jobId, jobData) => {
         aptitude_enabled,
         aptitude_level,
         aptitude_duration_minutes,
-        aptitude_question_count
+        aptitude_question_count,
+        pipeline_first_round
     } = jobData;
+
+    let previousStatus = null;
+    if (status !== undefined) {
+        const prevRes = await pool.query('SELECT status FROM jobs WHERE id = $1', [jobId]);
+        previousStatus = prevRes.rows[0]?.status || null;
+    }
 
     // Build dynamic update query to handle null values properly
     const updates = [];
@@ -155,6 +166,11 @@ export const updateJob = async (jobId, jobData) => {
         values.push(aptitude_question_count);
     }
 
+    if (pipeline_first_round !== undefined) {
+        updates.push(`pipeline_first_round = $${++paramCount}`);
+        values.push(pipeline_first_round);
+    }
+
     if (updates.length === 0) {
         // No updates provided, just return the existing job
         return await getJobById(jobId);
@@ -170,7 +186,14 @@ export const updateJob = async (jobId, jobData) => {
      RETURNING id`,
         values
     );
-    return await getJobById(jobId);
+
+    const updatedJob = await getJobById(jobId);
+
+    if (previousStatus && status === 'CLOSED' && previousStatus !== 'CLOSED') {
+        await rankJobApplications(jobId);
+    }
+
+    return updatedJob;
 };
 
 export const getJobById = async (jobId) => {
@@ -292,8 +315,8 @@ export const getJobScores = async (jobId) => {
     }
 
     const resumeRes = await pool.query(
-        `SELECT candidate_id, final_score, created_at
-         FROM resume_scores
+        `SELECT candidate_id, resume_score, updated_at
+         FROM applications
          WHERE job_id = $1 AND candidate_id = ANY($2::uuid[])`,
         [jobId, candidateIds]
     );
@@ -401,7 +424,7 @@ export const getJobScores = async (jobId) => {
             },
             scores: {
                 resume: resume
-                    ? { score: resume.final_score, computed_at: resume.created_at }
+                    ? { score: resume.resume_score, computed_at: resume.updated_at }
                     : { score: null, computed_at: null },
                 aptitude: apt
                     ? {

@@ -34,8 +34,53 @@ class AptitudeService {
     const applied = await aptitudeRepository.assertCandidateAppliedToJob(jobId, candidateId);
     if (!applied) throw new AppError('You are not assigned to this job', 403);
 
+    const win = await pool.query(
+      'SELECT selection_lock_from, selection_lock_until FROM jobs WHERE id = $1',
+      [jobId]
+    );
+    const fromRaw = win.rows[0]?.selection_lock_from;
+    const untilRaw = win.rows[0]?.selection_lock_until;
+    if (fromRaw && untilRaw) {
+      const from = new Date(fromRaw);
+      const until = new Date(untilRaw);
+      if (!Number.isNaN(from.getTime()) && !Number.isNaN(until.getTime())) {
+        const now = new Date();
+        if (now < from) throw new AppError('Round is not active yet. Please start within the interview window.', 403);
+        if (now > until) throw new AppError('Interview window has ended.', 403);
+      }
+    }
+
     const jobCfg = await aptitudeRepository.getJobAptitudeConfig(jobId);
     if (!jobCfg) throw new AppError('Job not found', 404);
+
+    // Pipeline gating (no-gap): if DSA is configured as the first round, aptitude is locked until CODING/DSA is completed.
+    try {
+      const pipeline = await pool.query('SELECT pipeline_first_round FROM jobs WHERE id = $1', [jobId]);
+      const first = pipeline.rows[0]?.pipeline_first_round || 'APTITUDE';
+      if (first === 'DSA') {
+        const codingSubmission = await pool.query(
+          `SELECT 1
+           FROM coding_submissions cs
+           JOIN coding_problems cp ON cp.id = cs.problem_id
+           JOIN interview_rounds ir ON ir.id = cp.round_id
+           WHERE ir.job_id = $1
+             AND ir.round_type = 'CODING'
+             AND cs.candidate_id = $2
+           LIMIT 1`,
+          [jobId, candidateId]
+        );
+
+        if (codingSubmission.rows.length === 0) {
+          throw new AppError('Complete DSA round first to unlock Aptitude round', 403);
+        }
+      }
+    } catch (err) {
+      // If the column does not exist yet, surface a clear error instead of failing silently.
+      if (err?.code === '42703') {
+        throw new AppError('Pipeline is not initialized. Please run initDb.js to migrate schema.', 500);
+      }
+      throw err;
+    }
 
     if (!jobCfg.aptitude_enabled) throw new AppError('Aptitude round not available for this job', 404);
 

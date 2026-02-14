@@ -110,6 +110,15 @@ const createTables = async () => {
         await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS aptitude_question_count INTEGER;`);
         console.log('Jobs aptitude config columns checked/created.');
 
+        await client.query(
+            `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pipeline_first_round VARCHAR(16) NOT NULL DEFAULT 'APTITUDE' CHECK (pipeline_first_round IN ('APTITUDE','DSA'));`
+        );
+
+        await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS selection_lock_from TIMESTAMP WITH TIME ZONE;`);
+        await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS selection_mail_sent_at TIMESTAMP WITH TIME ZONE;`);
+        await client.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS selection_lock_until TIMESTAMP WITH TIME ZONE;`);
+        console.log('Jobs pipeline config columns checked/created.');
+
         // Aptitude Questions Bank
         await client.query(`
             CREATE TABLE IF NOT EXISTS aptitude_questions (
@@ -190,6 +199,20 @@ const createTables = async () => {
             );
         `);
         console.log('Applications table checked/created.');
+
+        await client.query(
+            `ALTER TABLE applications ADD COLUMN IF NOT EXISTS stage VARCHAR(32) NOT NULL DEFAULT 'applied' CHECK (stage IN ('applied','shortlisted','rejected'));`
+        );
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS next_round VARCHAR(16) CHECK (next_round IN ('APTITUDE','DSA'));`);
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_score INTEGER;`);
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS aptitude_score INTEGER;`);
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS dsa_score INTEGER;`);
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS total_score INTEGER;`);
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS rank INTEGER;`);
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_data JSONB;`);
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_summary TEXT;`);
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_score_breakdown JSONB;`);
+        console.log('Applications workflow columns checked/created.');
 
         // Create Resumes Table
         await client.query(`
@@ -317,6 +340,8 @@ const createTables = async () => {
                 UNIQUE(job_id, candidate_id)
             );
         `);
+
+        await client.query(`ALTER TABLE dsa_round_attempts ADD COLUMN IF NOT EXISTS problem_ids UUID[];`);
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS dsa_round_submissions (

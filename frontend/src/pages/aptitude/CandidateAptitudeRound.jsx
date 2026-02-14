@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { startAptitudeRound, submitAptitudeRound } from '../../services/aptitudeService';
+import { getRounds } from '../../services/roundService';
 
 const pad2 = (n) => n.toString().padStart(2, '0');
 
@@ -19,6 +20,7 @@ const CandidateAptitudeRound = () => {
   const [result, setResult] = useState(null);
   const [nowTick, setNowTick] = useState(Date.now());
   const [autoSubmitted, setAutoSubmitted] = useState(false);
+  const [redirected, setRedirected] = useState(false);
 
   const timeLeftMs = useMemo(() => {
     if (!endsAt) return 0;
@@ -54,6 +56,69 @@ const CandidateAptitudeRound = () => {
 
     load();
   }, [jobId]);
+
+  useEffect(() => {
+    if (!result) return;
+    if (redirected) return;
+    setRedirected(true);
+
+    if (!jobId) {
+      navigate('/applications', { replace: true });
+      return;
+    }
+
+    const go = async () => {
+      try {
+        const r = await getRounds(jobId);
+        const rounds = Array.isArray(r?.data) ? r.data : [];
+        const hasCoding = rounds.some((x) => String(x?.round_type || '').toUpperCase() === 'CODING');
+        if (hasCoding) {
+          navigate(`/dsa/round/${jobId}`, { replace: true });
+          return;
+        }
+      } catch {
+        // if rounds api fails, fallback to applications
+      }
+
+      navigate('/applications', { replace: true });
+    };
+
+    go();
+  }, [result, redirected, navigate, jobId]);
+
+  useEffect(() => {
+    try {
+      if (document?.fullscreenElement == null && document?.documentElement?.requestFullscreen) {
+        const p = document.documentElement.requestFullscreen();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!attemptId) return;
+    if (result) return;
+
+    const onPop = () => {
+      try {
+        window.history.pushState(null, '', window.location.href);
+      } catch {
+        // ignore
+      }
+    };
+
+    try {
+      window.history.pushState(null, '', window.location.href);
+    } catch {
+      // ignore
+    }
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [attemptId, result]);
 
   useEffect(() => {
     if (!endsAt) return;
@@ -95,6 +160,40 @@ const CandidateAptitudeRound = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attemptId, endsAt, result, nowTick, autoSubmitted]);
 
+  useEffect(() => {
+    if (!attemptId) return;
+    if (result) return;
+    if (autoSubmitted) return;
+
+    const submitOnce = async () => {
+      if (autoSubmitted) return;
+      setAutoSubmitted(true);
+      try {
+        setSubmitting(true);
+        const answers = Object.entries(selectedByQuestion).map(([questionId, selected]) => ({ questionId, selected }));
+        const res = await submitAptitudeRound({ attemptId, answers });
+        setResult(res.data);
+        toast.success('Aptitude round submitted');
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Auto-submit failed');
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') submitOnce();
+    };
+    const onBlur = () => submitOnce();
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [attemptId, result, autoSubmitted, selectedByQuestion]);
+
   const onSelect = (questionId, letter) => {
     setSelectedByQuestion((prev) => ({ ...prev, [questionId]: letter }));
   };
@@ -124,12 +223,6 @@ const CandidateAptitudeRound = () => {
       <div className="p-8 max-w-3xl mx-auto">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
           <p className="text-slate-300">Unable to start aptitude round.</p>
-          <button
-            className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg"
-            onClick={() => navigate(-1)}
-          >
-            Back
-          </button>
         </div>
       </div>
     );
@@ -208,13 +301,6 @@ const CandidateAptitudeRound = () => {
         </div>
 
         <div className="flex items-center justify-between">
-          <button
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg"
-            onClick={() => navigate(-1)}
-          >
-            Back
-          </button>
-
           <button
             disabled={submitting || readOnly}
             onClick={onSubmit}

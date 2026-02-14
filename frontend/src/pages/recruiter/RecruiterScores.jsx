@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { getMyJobs } from '../../services/jobService';
+import { getJobOverview, getMyJobs } from '../../services/jobService';
 import { getJobScores } from '../../services/jobScoresService';
+import { rankCandidates, selectTopCandidates } from '../../services/recruiter.api';
+import { getRounds } from '../../services/roundService';
 
 const RecruiterScores = () => {
   const [jobs, setJobs] = useState([]);
@@ -10,6 +12,22 @@ const RecruiterScores = () => {
 
   const [scores, setScores] = useState(null);
   const [loadingScores, setLoadingScores] = useState(false);
+  const [rankingData, setRankingData] = useState(null);
+  const [ranking, setRanking] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false);
+  const [selectedInsight, setSelectedInsight] = useState(null);
+
+  const [selectOpen, setSelectOpen] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [topN, setTopN] = useState(50);
+  const [firstRound, setFirstRound] = useState('');
+  const [selectableNextRound, setSelectableNextRound] = useState('');
+  const [loadingFirstRound, setLoadingFirstRound] = useState(false);
+  const [interviewDate, setInterviewDate] = useState('');
+  const [interviewDay, setInterviewDay] = useState('');
+  const [timeFrom, setTimeFrom] = useState('');
+  const [timeTo, setTimeTo] = useState('');
+  const [selectionLockUntil, setSelectionLockUntil] = useState(null);
 
   useEffect(() => {
     const loadJobs = async () => {
@@ -31,6 +49,16 @@ const RecruiterScores = () => {
     const loadScores = async () => {
       if (!selectedJobId) {
         setScores(null);
+        setRankingData(null);
+        setInsightsOpen(false);
+        setSelectedInsight(null);
+        setFirstRound('');
+        setSelectableNextRound('');
+        setInterviewDate('');
+        setInterviewDay('');
+        setTimeFrom('');
+        setTimeTo('');
+        setSelectionLockUntil(null);
         return;
       }
 
@@ -49,7 +77,270 @@ const RecruiterScores = () => {
     loadScores();
   }, [selectedJobId]);
 
+  useEffect(() => {
+    const loadFirstRound = async () => {
+      if (!selectedJobId) {
+        setFirstRound('');
+        setSelectableNextRound('');
+        return;
+      }
+      setLoadingFirstRound(true);
+      try {
+        const res = await getJobOverview(selectedJobId);
+        // jobService.getJobOverview returns response.data
+        // shape: { status: 'success', data: jobWithRounds }
+        const job = res?.data;
+        setSelectionLockUntil(job?.selection_lock_until || null);
+        let rounds = Array.isArray(job?.rounds) ? job.rounds : [];
+
+        // Fallback: rounds are authored/saved via rounds module; if overview doesn't include them, fetch directly.
+        if (!rounds.length) {
+          try {
+            const r = await getRounds(selectedJobId);
+            rounds = Array.isArray(r?.data) ? r.data : [];
+          } catch {
+            // ignore
+          }
+        }
+
+        const normalized = rounds
+          .map((r) => ({
+            round_type: String(r?.round_type || '').toUpperCase(),
+            round_name: String(r?.round_name || ''),
+            round_order: r?.round_order
+          }))
+          .filter((r) => r.round_type);
+
+        const first = normalized.length > 0 ? normalized[0] : null;
+        if (!first) {
+          setFirstRound('');
+          setSelectableNextRound('');
+          return;
+        }
+
+        // UI label: map stored round_type to product terms
+        // interview_rounds.round_type uses: MCQ/CODING/INTERVIEW
+        // We treat MCQ as APTITUDE. For CODING, if name includes DSA we treat as DSA.
+        const firstLabel = (() => {
+          if (first.round_type === 'MCQ') return 'APTITUDE';
+          if (first.round_type === 'CODING') {
+            return /dsa/i.test(first.round_name) ? 'DSA' : 'CODING';
+          }
+          return first.round_type;
+        })();
+        setFirstRound(firstLabel);
+
+        // Backend selection + applications.next_round only supports APTITUDE/DSA
+        let next = '';
+        if (normalized.some((r) => r.round_type === 'MCQ')) next = 'APTITUDE';
+        else if (normalized.some((r) => r.round_type === 'CODING')) next = 'DSA';
+        setSelectableNextRound(next);
+      } catch {
+        setFirstRound('');
+        setSelectableNextRound('');
+        setSelectionLockUntil(null);
+      } finally {
+        setLoadingFirstRound(false);
+      }
+    };
+
+    loadFirstRound();
+  }, [selectedJobId]);
+
+  useEffect(() => {
+    if (!interviewDate) {
+      setInterviewDay('');
+      return;
+    }
+    const d = new Date(`${interviewDate}T00:00:00`);
+    if (Number.isNaN(d.getTime())) {
+      setInterviewDay('');
+      return;
+    }
+    setInterviewDay(d.toLocaleDateString(undefined, { weekday: 'long' }));
+  }, [interviewDate]);
+
+  const handleRank = async () => {
+    if (!selectedJobId) {
+      toast.error('Select a job first');
+      return;
+    }
+
+    setRanking(true);
+    try {
+      const res = await rankCandidates(selectedJobId);
+      setRankingData(res.data);
+      toast.success('Candidates ranked');
+
+      // Refresh scores view after ranking (optional but keeps UI in sync)
+      try {
+        const scoresRes = await getJobScores(selectedJobId);
+        setScores(scoresRes.data);
+      } catch {
+        // ignore
+      }
+    } catch (err) {
+      setRankingData(null);
+      toast.error(err.response?.data?.message || 'Ranking failed');
+    } finally {
+      setRanking(false);
+    }
+  };
+
   const candidates = useMemo(() => scores?.candidates || [], [scores]);
+  const insightsByCandidateId = useMemo(() => {
+    const list = rankingData?.ranked_candidates || [];
+    const map = new Map();
+    for (const item of list) {
+      if (item?.candidate_id) map.set(item.candidate_id, item);
+    }
+    return map;
+  }, [rankingData]);
+
+  const displayCandidates = useMemo(() => {
+    if (!candidates.length) return candidates;
+    if (!rankingData?.ranked_candidates?.length) return candidates;
+
+    return [...candidates].sort((a, b) => {
+      const aRank = insightsByCandidateId.get(a?.candidate?.id)?.rank;
+      const bRank = insightsByCandidateId.get(b?.candidate?.id)?.rank;
+
+      const aHasRank = Number.isFinite(aRank);
+      const bHasRank = Number.isFinite(bRank);
+
+      if (aHasRank && bHasRank) return aRank - bRank;
+      if (aHasRank) return -1;
+      if (bHasRank) return 1;
+      return 0;
+    });
+  }, [candidates, insightsByCandidateId, rankingData]);
+
+  const openInsights = (insight) => {
+    setSelectedInsight(insight);
+    setInsightsOpen(true);
+  };
+
+  const closeInsights = () => {
+    setInsightsOpen(false);
+    setSelectedInsight(null);
+  };
+
+  const closeSelect = () => {
+    if (selecting) return;
+    setSelectOpen(false);
+  };
+
+  const isValidAmPmTime = (value) => {
+    if (!value) return false;
+    return /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i.test(String(value).trim());
+  };
+
+  const parseAmPmTo24h = (value) => {
+    const v = String(value || '').trim();
+    const match = v.match(/^(0?[1-9]|1[0-2]):([0-5][0-9])\s?(AM|PM)$/i);
+    if (!match) return null;
+    let hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const meridiem = String(match[3]).toUpperCase();
+    if (meridiem === 'AM') {
+      if (hours === 12) hours = 0;
+    } else {
+      if (hours !== 12) hours += 12;
+    }
+    return { hours, minutes };
+  };
+
+  const isSelectionLocked = useMemo(() => {
+    if (!selectionLockUntil) return false;
+    const d = new Date(selectionLockUntil);
+    if (Number.isNaN(d.getTime())) return false;
+    return d > new Date();
+  }, [selectionLockUntil]);
+
+  const handleSendSelection = async () => {
+    if (!selectedJobId) {
+      toast.error('Select a job first');
+      return;
+    }
+    if (!rankingData?.ranked_candidates?.length) {
+      toast.error('Please rank candidates first');
+      return;
+    }
+    if (!selectableNextRound) {
+      toast.error('This job must include APTITUDE or DSA rounds to proceed');
+      return;
+    }
+    if (!topN || Number.isNaN(Number(topN)) || Number(topN) <= 0) {
+      toast.error('Top N must be a positive number');
+      return;
+    }
+    if (!interviewDate || !timeFrom || !timeTo) {
+      toast.error('Please fill interview date and time interval');
+      return;
+    }
+    if (!isValidAmPmTime(timeFrom) || !isValidAmPmTime(timeTo)) {
+      toast.error('Time must be in hh:mm AM/PM format (e.g., 05:00 PM)');
+      return;
+    }
+
+    const startParts = parseAmPmTo24h(timeFrom);
+    if (!startParts) {
+      toast.error('Invalid start time format');
+      return;
+    }
+
+    const endParts = parseAmPmTo24h(timeTo);
+    if (!endParts) {
+      toast.error('Invalid end time format');
+      return;
+    }
+
+    const lockFrom = new Date(`${interviewDate}T00:00:00`);
+    lockFrom.setHours(startParts.hours, startParts.minutes, 0, 0);
+    if (Number.isNaN(lockFrom.getTime())) {
+      toast.error('Invalid interview date');
+      return;
+    }
+
+    const lockUntil = new Date(`${interviewDate}T00:00:00`);
+    lockUntil.setHours(endParts.hours, endParts.minutes, 0, 0);
+    if (Number.isNaN(lockUntil.getTime())) {
+      toast.error('Invalid interview date');
+      return;
+    }
+
+    if (lockFrom > lockUntil) {
+      toast.error('Start time must be before end time');
+      return;
+    }
+
+    setSelecting(true);
+    try {
+      const payload = {
+        top_n: Number(topN),
+        next_round: selectableNextRound,
+        date: `${interviewDate}${interviewDay ? ` (${interviewDay})` : ''}`,
+        time: `${timeFrom} to ${timeTo}`,
+        duration: '',
+        instructions: 'Please join on time. Further details will be shared soon.',
+        lock_from: lockFrom.toISOString(),
+        lock_until: lockUntil.toISOString()
+      };
+
+      await selectTopCandidates(selectedJobId, payload);
+      toast.success('Emails sent. Non-selected candidates removed.');
+
+      setSelectionLockUntil(lockUntil.toISOString());
+
+      const scoresRes = await getJobScores(selectedJobId);
+      setScores(scoresRes.data);
+      setSelectOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send emails');
+    } finally {
+      setSelecting(false);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -74,6 +365,38 @@ const RecruiterScores = () => {
               </option>
             ))}
           </select>
+
+          <button
+            onClick={handleRank}
+            disabled={!selectedJobId || ranking}
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg transition disabled:opacity-50"
+          >
+            {ranking ? 'Ranking...' : 'Rank Candidates'}
+          </button>
+
+          <button
+            onClick={() => {
+              if (!rankingData?.ranked_candidates?.length) {
+                toast.error('Please rank candidates first');
+                return;
+              }
+              if (isSelectionLocked) {
+                toast.error('Selection is locked until the interview window ends');
+                return;
+              }
+              if (interviewDate) {
+                const d = new Date(`${interviewDate}T00:00:00`);
+                if (!Number.isNaN(d.getTime())) {
+                  setInterviewDay(d.toLocaleDateString(undefined, { weekday: 'long' }));
+                }
+              }
+              setSelectOpen(true);
+            }}
+            disabled={!selectedJobId || selecting || !rankingData?.ranked_candidates?.length || isSelectionLocked}
+            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg transition disabled:opacity-50"
+          >
+            {selecting ? 'Sending...' : 'Select'}
+          </button>
         </div>
       </div>
 
@@ -87,7 +410,7 @@ const RecruiterScores = () => {
 
       {!loadingScores && candidates.length > 0 && (
         <div className="space-y-3">
-          {candidates.map((row) => (
+          {displayCandidates.map((row) => (
             <div key={row.candidate.id} className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
@@ -125,8 +448,224 @@ const RecruiterScores = () => {
                   </div>
                 </div>
               </div>
+
+              {insightsByCandidateId.has(row.candidate.id) && (
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <div className="text-xs text-slate-400">
+                    Rank:{' '}
+                    <span className="text-white font-semibold">
+                      {insightsByCandidateId.get(row.candidate.id)?.rank ?? '--'}
+                    </span>
+                    <span className="mx-2 text-slate-600">|</span>
+                    Total Score:{' '}
+                    <span className="text-white font-semibold">
+                      {Number(
+                        insightsByCandidateId.get(row.candidate.id)?.final_score ??
+                          insightsByCandidateId.get(row.candidate.id)?.total_score ??
+                          insightsByCandidateId.get(row.candidate.id)?.resume_score ??
+                          0
+                      ).toFixed(1)}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => openInsights(insightsByCandidateId.get(row.candidate.id))}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition"
+                  >
+                    View Insights
+                  </button>
+                </div>
+              )}
             </div>
           ))}
+        </div>
+      )}
+
+      {insightsOpen && selectedInsight && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/70" onClick={closeInsights} />
+          <div className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Candidate Insights</p>
+                <h3 className="text-xl font-semibold text-white mt-2">
+                  {selectedInsight.candidate_name || 'Candidate'}
+                </h3>
+              </div>
+
+              <button
+                onClick={closeInsights}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-5 text-sm">
+              <div className="bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2">
+                <p className="text-xs text-slate-500">Rank</p>
+                <p className="text-white font-semibold">{selectedInsight.rank ?? '--'}</p>
+              </div>
+              <div className="bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2">
+                <p className="text-xs text-slate-500">Total Score</p>
+                <p className="text-white font-semibold">
+                  {Number(
+                    selectedInsight.final_score ??
+                      selectedInsight.total_score ??
+                      selectedInsight.resume_score ??
+                      0
+                  ).toFixed(1)}
+                </p>
+              </div>
+            </div>
+
+            {(selectedInsight.resume_summary || selectedInsight.summary) && (
+              <div className="mt-4">
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Summary</p>
+                <p className="text-slate-200 mt-2 text-sm leading-relaxed">
+                  {selectedInsight.resume_summary || selectedInsight.summary}
+                </p>
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-2 gap-4 mt-4">
+              <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Strengths</p>
+                <div className="mt-2 space-y-2">
+                  {(selectedInsight.strengths || []).length > 0 ? (
+                    (selectedInsight.strengths || []).map((s, i) => (
+                      <p key={i} className="text-sm text-slate-200">{s}</p>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-400">No strengths noted yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+              {isSelectionLocked && (
+                <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-300">
+                  Selection is locked until: <span className="text-white font-semibold">{new Date(selectionLockUntil).toLocaleString()}</span>
+                </div>
+              )}
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Gaps</p>
+                <div className="mt-2 space-y-2">
+                  {(selectedInsight.gaps || []).length > 0 ? (
+                    (selectedInsight.gaps || []).map((g, i) => (
+                      <p key={i} className="text-sm text-slate-200">{g}</p>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-400">No gaps noted yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {selectedInsight.resume_score_breakdown && (
+              <div className="mt-4 bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Score Breakdown</p>
+                <pre className="mt-2 text-xs text-slate-200 overflow-auto whitespace-pre-wrap">
+                  {JSON.stringify(selectedInsight.resume_score_breakdown, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {selectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/70" onClick={closeSelect} />
+          <div className="relative w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Selection</p>
+                <h3 className="text-xl font-semibold text-white mt-2">Send Interview Details</h3>
+              </div>
+
+              <button
+                onClick={closeSelect}
+                disabled={selecting}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition disabled:opacity-50"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Top N candidates</p>
+                <input
+                  type="number"
+                  min="1"
+                  value={topN}
+                  onChange={(e) => setTopN(e.target.value)}
+                  className="mt-2 w-full bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  placeholder="e.g. 50"
+                />
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-widest">First round</p>
+                <div className="mt-2 w-full bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2 text-white">
+                  {loadingFirstRound ? 'Loading...' : (firstRound || '--')}
+                </div>
+                {!loadingFirstRound && !selectableNextRound && (
+                  <p className="text-[11px] text-slate-500 mt-2">Add an APTITUDE or DSA round in this job to enable selection emails.</p>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Interview date + day</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                  <input
+                    type="date"
+                    value={interviewDate}
+                    onChange={(e) => setInterviewDate(e.target.value)}
+                    className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  />
+                  <div className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+                    {interviewDay || '--'}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-widest">Time interval</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                  <input
+                    type="text"
+                    value={timeFrom}
+                    onChange={(e) => setTimeFrom(e.target.value)}
+                    className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    placeholder="05:00 PM"
+                  />
+                  <input
+                    type="text"
+                    value={timeTo}
+                    onChange={(e) => setTimeTo(e.target.value)}
+                    className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    placeholder="07:00 PM"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                  <p className="text-[11px] text-slate-500">Start time</p>
+                  <p className="text-[11px] text-slate-500">End time</p>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-2">Format: hh:mm AM/PM (example: 05:00 PM)</p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                onClick={handleSendSelection}
+                disabled={selecting}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg transition disabled:opacity-50"
+              >
+                {selecting ? 'Sending...' : 'Send Mail'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

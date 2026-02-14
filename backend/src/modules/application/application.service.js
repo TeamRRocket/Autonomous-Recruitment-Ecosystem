@@ -1,6 +1,7 @@
 import applicationRepository from './application.repository.js';
 import AppError from '../../utils/AppError.js';
 import { pool } from '../../config/db.js';
+import { processApplicationResume } from '../resume/resumeProcessing.service.js';
 
 class ApplicationService {
     async createApplication(userId, jobId, resumeFilePath) {
@@ -42,6 +43,8 @@ class ApplicationService {
             resume_file_path: resumeFilePath,
             status: 'PENDING'
         });
+
+        await processApplicationResume({ applicationId: application.id });
 
         return await applicationRepository.findById(application.id);
     }

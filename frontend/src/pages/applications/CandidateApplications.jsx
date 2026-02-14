@@ -11,7 +11,7 @@ import {
     FileText,
     ExternalLink
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const CandidateApplications = () => {
@@ -19,6 +19,93 @@ const CandidateApplications = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('ALL');
+    const navigate = useNavigate();
+
+    const canStartRounds = (app) => {
+        if ((app?.stage || '').toString().toLowerCase() !== 'shortlisted') return false;
+        if (!app?.next_round) return false;
+
+        const next = (app?.next_round || '').toString().toUpperCase();
+        if (next === 'APTITUDE') {
+            const st = (app?.aptitude_attempt_status || '').toString().toLowerCase();
+            if (st === 'submitted' || st === 'expired') return false;
+        }
+
+        if (next === 'DSA' || next === 'CODING') {
+            const st = (app?.dsa_attempt_status || '').toString().toLowerCase();
+            if (st === 'submitted' || st === 'expired') return false;
+        }
+
+        const fromRaw = app?.selection_lock_from;
+        const untilRaw = app?.selection_lock_until;
+        if (!fromRaw || !untilRaw) return true;
+
+        const from = new Date(fromRaw);
+        const until = new Date(untilRaw);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(until.getTime())) return true;
+
+        const now = new Date();
+        return now >= from && now <= until;
+    };
+
+    const getRoundWindow = (app) => {
+        const fromRaw = app?.selection_lock_from;
+        const untilRaw = app?.selection_lock_until;
+        if (!fromRaw || !untilRaw) return null;
+        const from = new Date(fromRaw);
+        const until = new Date(untilRaw);
+        if (Number.isNaN(from.getTime()) || Number.isNaN(until.getTime())) return null;
+        return { from, until };
+    };
+
+    const handleStartRound = (app) => {
+        const window = getRoundWindow(app);
+        if (window) {
+            const now = new Date();
+            if (now < window.from) {
+                toast.error(`Round will be active from ${window.from.toLocaleString()}`);
+                return;
+            }
+            if (now > window.until) {
+                toast.error('Interview window has ended');
+                return;
+            }
+        }
+
+        const next = (app?.next_round || '').toString().toUpperCase();
+
+        if (!next) {
+            toast.error('Next round is not assigned yet');
+            return;
+        }
+
+        if (next === 'APTITUDE') {
+            try {
+                if (document?.documentElement?.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                }
+            } catch {
+                // ignore
+            }
+            navigate(`/aptitude/round/${app.job_id}`);
+            return;
+        }
+
+        if (next === 'DSA' || next === 'CODING') {
+            try {
+                if (document?.documentElement?.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                }
+            } catch {
+                // ignore
+            }
+
+            navigate(`/dsa/round/${app.job_id}`);
+            return;
+        }
+
+        toast.error(`Unknown next round: ${next}`);
+    };
 
     useEffect(() => {
         fetchApplications();
@@ -144,9 +231,34 @@ const CandidateApplications = () => {
                                             </p>
                                         </div>
                                     )}
+
+                                    {canStartRounds(app) && (
+                                        <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-4 py-2 mt-3">
+                                            <p className="text-indigo-200 text-sm">Next Round: <span className="font-semibold">{String(app.next_round).toUpperCase()}</span></p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center gap-3 self-end lg:self-center">
+                                    {canStartRounds(app) && (
+                                        <button
+                                            onClick={() => handleStartRound(app)}
+                                            className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition-all border border-indigo-500/30"
+                                        >
+                                            Start Round
+                                            <ArrowRight size={16} className="ml-2" />
+                                        </button>
+                                    )}
+                                    {!canStartRounds(app) && (app?.stage || '').toString().toLowerCase() === 'shortlisted' && (app?.next_round || '').toString().toUpperCase() === 'APTITUDE' && ['submitted', 'expired'].includes((app?.aptitude_attempt_status || '').toString().toLowerCase()) && (
+                                        <div className="inline-flex items-center px-4 py-2 bg-slate-800/60 text-slate-200 rounded-xl text-sm font-semibold border border-slate-700">
+                                            Already attempted
+                                        </div>
+                                    )}
+                                    {!canStartRounds(app) && (app?.stage || '').toString().toLowerCase() === 'shortlisted' && ['DSA', 'CODING'].includes((app?.next_round || '').toString().toUpperCase()) && ['submitted', 'expired'].includes((app?.dsa_attempt_status || '').toString().toLowerCase()) && (
+                                        <div className="inline-flex items-center px-4 py-2 bg-slate-800/60 text-slate-200 rounded-xl text-sm font-semibold border border-slate-700">
+                                            Already attempted
+                                        </div>
+                                    )}
                                     <Link
                                         to={`/jobs/${app.job_id}`}
                                         className="inline-flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-medium transition-all border border-slate-700 hover:border-slate-600 group/btn"

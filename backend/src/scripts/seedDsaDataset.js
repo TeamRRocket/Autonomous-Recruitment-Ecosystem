@@ -6,7 +6,15 @@ import { pool } from '../config/db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DATASET_PATH = path.resolve(__dirname, './dsa_dataset.json');
+const defaultDatasetPath = path.resolve(__dirname, '../../../datasets/leetcode_dataset - lc.csv');
+
+const getArgValue = (key) => {
+  const idx = process.argv.findIndex((a) => a === key);
+  if (idx === -1) return null;
+  return process.argv[idx + 1] || null;
+};
+
+const DATASET_PATH = getArgValue('--dataset') || process.env.DSA_DATASET_PATH || defaultDatasetPath;
 
 const normalizeDifficulty = (value) => {
   const v = (value || '').toString().trim().toLowerCase();
@@ -14,13 +22,89 @@ const normalizeDifficulty = (value) => {
   return 'easy';
 };
 
-const readDataset = () => {
-  const raw = fs.readFileSync(DATASET_PATH, 'utf8');
-  const parsed = JSON.parse(raw);
-  if (!parsed || !Array.isArray(parsed.problems)) {
-    throw new Error('Invalid dataset format: expected { problems: [...] }');
+const normalizeDifficultyFromCsv = (value) => {
+  const v = (value || '').toString().trim().toLowerCase();
+  if (v === 'easy') return 'easy';
+  if (v === 'medium') return 'medium';
+  if (v === 'hard') return 'hard';
+  return 'easy';
+};
+
+// Minimal CSV parser that supports quoted fields containing commas/newlines.
+const parseCsv = (raw) => {
+  const rows = [];
+  let current = '';
+  let row = [];
+  let inQuotes = false;
+
+  for (let i = 0; i < raw.length; i += 1) {
+    const ch = raw[i];
+
+    if (ch === '"') {
+      const next = raw[i + 1];
+      if (inQuotes && next === '"') {
+        current += '"';
+        i += 1;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (ch === ',' && !inQuotes) {
+      row.push(current);
+      current = '';
+      continue;
+    }
+
+    if ((ch === '\n' || ch === '\r') && !inQuotes) {
+      if (ch === '\r' && raw[i + 1] === '\n') i += 1;
+      row.push(current);
+      current = '';
+      if (row.length > 1) rows.push(row);
+      row = [];
+      continue;
+    }
+
+    current += ch;
   }
-  return parsed.problems;
+
+  row.push(current);
+  if (row.length > 1) rows.push(row);
+  return rows;
+};
+
+const readDataset = () => {
+  if (!fs.existsSync(DATASET_PATH)) {
+    throw new Error(`Dataset not found at: ${DATASET_PATH}`);
+  }
+
+  const raw = fs.readFileSync(DATASET_PATH, 'utf8');
+  const rows = parseCsv(raw);
+  if (!rows.length) return [];
+
+  const header = rows[0].map((h) => (h || '').toString().trim());
+  const idxId = header.findIndex((h) => h.toLowerCase() === 'id');
+  const idxTitle = header.findIndex((h) => h.toLowerCase() === 'title');
+  const idxDesc = header.findIndex((h) => h.toLowerCase() === 'description');
+  const idxDiff = header.findIndex((h) => h.toLowerCase() === 'difficulty');
+
+  if (idxId === -1 || idxTitle === -1 || idxDesc === -1 || idxDiff === -1) {
+    throw new Error('Unexpected CSV header. Expected columns: id,title,description,difficulty');
+  }
+
+  const problems = [];
+  for (let i = 1; i < rows.length; i += 1) {
+    const r = rows[i];
+    const datasetId = (r[idxId] || '').toString().trim();
+    const title = (r[idxTitle] || '').toString().trim();
+    const statement = (r[idxDesc] || '').toString().trim();
+    const difficulty = normalizeDifficultyFromCsv(r[idxDiff]);
+    if (!datasetId || !title || !statement) continue;
+    problems.push({ dataset_id: datasetId, title, difficulty, problem_statement: statement });
+  }
+
+  return problems;
 };
 
 const seed = async () => {
@@ -34,14 +118,14 @@ const seed = async () => {
     await client.query('BEGIN');
 
     for (const p of problems) {
-      if (!p.id || !p.title || !p.problem_statement) {
-        throw new Error(`Invalid problem entry (missing id/title/problem_statement): ${JSON.stringify(p).slice(0, 200)}`);
+      if (!p.dataset_id || !p.title || !p.problem_statement) {
+        throw new Error(`Invalid problem entry (missing dataset_id/title/problem_statement): ${JSON.stringify(p).slice(0, 200)}`);
       }
 
       const difficulty = normalizeDifficulty(p.difficulty);
-      const constraints = Array.isArray(p.constraints) ? p.constraints : null;
-      const timeLimitMs = Number.isFinite(p.time_limit_ms) ? p.time_limit_ms : 1000;
-      const memoryLimitMb = Number.isFinite(p.memory_limit_mb) ? p.memory_limit_mb : 256;
+      const constraints = null;
+      const timeLimitMs = 1000;
+      const memoryLimitMb = 256;
 
       const upsert = await client.query(
         `INSERT INTO dsa_bank_problems (
@@ -60,7 +144,7 @@ const seed = async () => {
             updated_at = CURRENT_TIMESTAMP
           RETURNING id`,
         [
-          p.id,
+          p.dataset_id,
           p.title,
           difficulty,
           p.problem_statement,
@@ -73,20 +157,8 @@ const seed = async () => {
 
       const problemId = upsert.rows[0].id;
 
-      await client.query('DELETE FROM dsa_bank_test_cases WHERE problem_id = $1', [problemId]);
-
-      const tcs = Array.isArray(p.test_cases) ? p.test_cases : [];
-      for (let i = 0; i < tcs.length; i += 1) {
-        const tc = tcs[i];
-        if (!tc || typeof tc.input !== 'string' || typeof tc.expected_output !== 'string') continue;
-
-        await client.query(
-          `INSERT INTO dsa_bank_test_cases (
-              problem_id, test_order, input, expected_output, is_hidden
-            ) VALUES ($1,$2,$3,$4,$5)`,
-          [problemId, i + 1, tc.input, tc.expected_output, !!tc.is_hidden]
-        );
-      }
+      // No testcases in this dataset. Keep any existing testcases intact.
+      void problemId;
     }
 
     await client.query('COMMIT');

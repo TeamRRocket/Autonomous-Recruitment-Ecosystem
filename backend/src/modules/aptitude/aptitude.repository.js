@@ -49,6 +49,8 @@ class AptitudeRepository {
     const res = await client.query(
       `INSERT INTO candidate_aptitude_attempts (candidate_id, job_id, ends_at, status)
        VALUES ($1,$2,$3,'started')
+       ON CONFLICT (job_id, candidate_id)
+       DO UPDATE SET ends_at = candidate_aptitude_attempts.ends_at
        RETURNING *`,
       [candidateId, jobId, endsAtIso]
     );

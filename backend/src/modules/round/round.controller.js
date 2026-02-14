@@ -1,6 +1,7 @@
 import * as roundService from './round.service.js';
 import * as jobService from '../job/job.service.js';
 import * as recruiterService from '../recruiter/recruiter.service.js';
+import { pool } from '../../config/db.js';
 import AppError from '../../utils/AppError.js';
 import catchAsync from '../../utils/catchAsync.js';
 
@@ -62,7 +63,19 @@ export const getRounds = catchAsync(async (req, res, next) => {
 
     // If candidate, job must be published
     if (req.user.role === 'CANDIDATE' && job.status !== 'PUBLISHED') {
-        return next(new AppError('Job not available', 404));
+        const cand = await pool.query('SELECT id FROM candidate_profiles WHERE user_id = $1', [req.user.id]);
+        const candidateId = cand.rows[0]?.id;
+        if (!candidateId) {
+            return next(new AppError('Job not available', 404));
+        }
+
+        const assigned = await pool.query(
+            'SELECT 1 FROM applications WHERE job_id = $1 AND candidate_id = $2 LIMIT 1',
+            [jobId, candidateId]
+        );
+        if (assigned.rows.length === 0) {
+            return next(new AppError('Job not available', 404));
+        }
     }
 
     // If recruiter, check ownership for non-published jobs

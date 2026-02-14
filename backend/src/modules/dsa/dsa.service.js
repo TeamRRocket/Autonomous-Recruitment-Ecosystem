@@ -82,11 +82,32 @@ const redisKeys = (attemptId) => ({
   drafts: `dsa:round:${attemptId}:drafts`,
 });
 
+const getSubmittedProblemIds = async (attemptId, client = pool) => {
+  const res = await client.query(
+    `SELECT DISTINCT problem_id
+     FROM dsa_round_submissions
+     WHERE attempt_id = $1 AND is_final = TRUE`,
+    [attemptId]
+  );
+  return res.rows.map((r) => r.problem_id);
+};
+
+const assertProblemNotFinalSubmitted = async ({ attemptId, problemId }) => {
+  const res = await pool.query(
+    `SELECT 1
+     FROM dsa_round_submissions
+     WHERE attempt_id = $1 AND problem_id = $2 AND is_final = TRUE
+     LIMIT 1`,
+    [attemptId, problemId]
+  );
+  if (res.rows.length > 0) throw new AppError('Problem already submitted', 400);
+};
+
 const rateLimit = async (key, limit, windowSeconds) => {
   await ensureRedisConnected();
   const multi = redis.multi();
   multi.incr(key);
-  multi.expire(key, windowSeconds, { NX: true });
+  multi.expire(key, windowSeconds, 'NX');
   const replies = await multi.exec();
   const current = Number(replies?.[0]);
   if (current > limit) {
@@ -112,6 +133,109 @@ const validateDifficulty = (value) => {
   return v;
 };
 
+const mapRoundDifficulty = (value) => {
+  const v = (value || '').toString().trim().toUpperCase();
+  if (v === 'EASY') return 'easy';
+  if (v === 'MEDIUM') return 'medium';
+  if (v === 'HARD') return 'hard';
+  return 'medium';
+};
+
+const getJobDsaSettings = async (jobId) => {
+  const res = await pool.query(
+    `SELECT duration_minutes, num_questions, difficulty_level
+     FROM interview_rounds
+     WHERE job_id = $1 AND round_type = 'CODING'
+     ORDER BY round_order ASC
+     LIMIT 1`,
+    [jobId]
+  );
+  if (res.rows.length === 0) {
+    throw new AppError('DSA round not configured for this job', 404);
+  }
+  const r = res.rows[0];
+  const duration = Number(r.duration_minutes);
+  const numQuestions = Number(r.num_questions);
+  if (!Number.isFinite(duration) || duration <= 0) throw new AppError('DSA duration is invalid for this job', 500);
+  if (!Number.isFinite(numQuestions) || numQuestions <= 0) throw new AppError('DSA num_questions is invalid for this job', 500);
+  return {
+    time_limit_minutes: duration,
+    num_questions: numQuestions,
+    difficulty: mapRoundDifficulty(r.difficulty_level),
+  };
+};
+
+const ensureAutoPublishedConfig = async (jobId) => {
+  const settings = await getJobDsaSettings(jobId);
+  const upsert = await pool.query(
+    `INSERT INTO dsa_round_configs (job_id, enabled, num_questions, difficulty, time_limit_minutes, published, published_at)
+     VALUES ($1, TRUE, $2, $3, $4, TRUE, CURRENT_TIMESTAMP)
+     ON CONFLICT (job_id)
+     DO UPDATE SET
+       enabled = TRUE,
+       num_questions = EXCLUDED.num_questions,
+       difficulty = EXCLUDED.difficulty,
+       time_limit_minutes = EXCLUDED.time_limit_minutes,
+       published = TRUE,
+       published_at = COALESCE(dsa_round_configs.published_at, CURRENT_TIMESTAMP),
+       updated_at = CURRENT_TIMESTAMP
+     RETURNING *`,
+    [jobId, settings.num_questions, settings.difficulty, settings.time_limit_minutes]
+  );
+  return upsert.rows[0];
+};
+
+const pickRandomProblemsForAttempt = async ({ jobId, difficulty, limit }) => {
+  const primary = await pool.query(
+    `SELECT p.id
+     FROM dsa_bank_problems p
+     WHERE p.difficulty = $1
+       AND NOT EXISTS (
+         SELECT 1
+         FROM dsa_round_attempts a
+         WHERE a.job_id = $2
+           AND a.problem_ids IS NOT NULL
+           AND p.id = ANY(a.problem_ids)
+       )
+     ORDER BY RANDOM()
+     LIMIT $3`,
+    [difficulty, jobId, limit]
+  );
+  let ids = primary.rows.map((r) => r.id);
+
+  if (ids.length < limit) {
+    const fallback = await pool.query(
+      `SELECT id
+       FROM dsa_bank_problems
+       WHERE difficulty = $1
+       ORDER BY RANDOM()
+       LIMIT $2`,
+      [difficulty, limit]
+    );
+    ids = fallback.rows.map((r) => r.id);
+  }
+
+  if (ids.length < limit) throw new AppError('Not enough DSA problems in dataset for this difficulty', 500);
+  return ids;
+};
+
+const getProblemsByIds = async (ids) => {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  const res = await pool.query(
+    `SELECT id, dataset_id, title, difficulty, problem_statement, constraints, boilerplate_cpp, time_limit_ms, memory_limit_mb
+     FROM dsa_bank_problems
+     WHERE id = ANY($1::uuid[])`,
+    [ids]
+  );
+  const byId = new Map(res.rows.map((r) => [r.id, r]));
+  const ordered = [];
+  for (const id of ids) {
+    const row = byId.get(id);
+    if (row) ordered.push(row);
+  }
+  return ordered;
+};
+
 const getActiveAttempt = async (jobId, candidateId) => {
   const res = await pool.query(
     `SELECT * FROM dsa_round_attempts
@@ -132,7 +256,7 @@ const autoSubmitIfExpired = async (userId, candidateId, attempt) => {
   const status = await redis.get(keys.status);
   if (status) return null;
 
-  const problems = await getConfigProblems(attempt.config_id);
+  const problems = attempt.problem_ids ? await getProblemsByIds(attempt.problem_ids) : await getConfigProblems(attempt.config_id);
   const drafts = await redis.hGetAll(keys.drafts);
 
   const solutions = problems.map((p) => ({
@@ -377,13 +501,87 @@ export const startRound = async (userId, body) => {
   const candidateId = await assertCandidateProfile(userId);
   await assertAssignedToJob(job_id, candidateId);
 
-  const config = await getPublishedConfig(job_id);
+  const win = await pool.query(
+    'SELECT selection_lock_from, selection_lock_until FROM jobs WHERE id = $1',
+    [job_id]
+  );
+  const fromRaw = win.rows[0]?.selection_lock_from;
+  const untilRaw = win.rows[0]?.selection_lock_until;
+  if (fromRaw && untilRaw) {
+    const from = new Date(fromRaw);
+    const until = new Date(untilRaw);
+    if (!Number.isNaN(from.getTime()) && !Number.isNaN(until.getTime())) {
+      const now = new Date();
+      if (now < from) throw new AppError('Round is not active yet. Please start within the interview window.', 403);
+      if (now > until) throw new AppError('Interview window has ended.', 403);
+    }
+  }
+
+  // Pipeline gating (no-gap): if Aptitude is configured as the first round, DSA is locked until Aptitude is completed.
+  try {
+    const pipeline = await pool.query('SELECT pipeline_first_round FROM jobs WHERE id = $1', [job_id]);
+    const first = pipeline.rows[0]?.pipeline_first_round || 'APTITUDE';
+    if (first === 'APTITUDE') {
+      const aptAttempt = await pool.query(
+        `SELECT status
+         FROM candidate_aptitude_attempts
+         WHERE job_id = $1 AND candidate_id = $2
+         LIMIT 1`,
+        [job_id, candidateId]
+      );
+      const st = aptAttempt.rows[0]?.status || null;
+      const completed = st === 'submitted' || st === 'expired';
+      if (!completed) {
+        throw new AppError('Complete Aptitude round first to unlock DSA round', 403);
+      }
+    }
+  } catch (err) {
+    if (err?.code === '42703') {
+      throw new AppError('Pipeline is not initialized. Please run initDb.js to migrate schema.', 500);
+    }
+    throw err;
+  }
+
+  const config = await ensureAutoPublishedConfig(job_id);
 
   const existing = await getActiveAttempt(job_id, candidateId);
   if (existing) {
     await ensureNotExpired(existing);
     if (existing.status === 'IN_PROGRESS') {
-      return await getStatus(userId, { job_id });
+      const problems = await getProblemsByIds(existing.problem_ids || []);
+      const submittedProblemIds = await getSubmittedProblemIds(existing.id);
+      const totalProblems = Array.isArray(existing.problem_ids) ? existing.problem_ids.length : 0;
+
+      const problemsForClient = [];
+      for (const p of problems) {
+        const publicTests = await getPublicTestCasesForProblem(p.id);
+        problemsForClient.push({
+          id: p.id,
+          dataset_id: p.dataset_id,
+          title: p.title,
+          difficulty: p.difficulty,
+          problem_statement: p.problem_statement,
+          constraints: p.constraints,
+          boilerplate_cpp: p.boilerplate_cpp,
+          time_limit_ms: p.time_limit_ms,
+          memory_limit_mb: p.memory_limit_mb,
+          problem_order: p.problem_order,
+          public_test_cases: publicTests,
+          language: { id: CPP_LANGUAGE_ID, name: 'C++ (GNU++17)' },
+        });
+      }
+
+      return {
+        attempt_id: existing.id,
+        job_id,
+        status: existing.status,
+        started_at: existing.started_at,
+        ends_at: existing.ends_at,
+        server_time: nowIso(),
+        submitted_problem_ids: submittedProblemIds,
+        remaining: Math.max(0, totalProblems - submittedProblemIds.length),
+        problems: problemsForClient,
+      };
     }
     if (existing.status === 'SUBMITTED') {
       throw new AppError('You have already completed this DSA round', 400);
@@ -392,25 +590,58 @@ export const startRound = async (userId, body) => {
 
   const endsAt = new Date(Date.now() + Number(config.time_limit_minutes) * 60_000);
 
-  const insert = await pool.query(
-    `INSERT INTO dsa_round_attempts (job_id, config_id, candidate_id, status, ends_at)
-     VALUES ($1,$2,$3,'IN_PROGRESS',$4)
+  const settings = await getJobDsaSettings(job_id);
+  const problemIds = await pickRandomProblemsForAttempt({
+    jobId: job_id,
+    difficulty: settings.difficulty,
+    limit: settings.num_questions,
+  });
+
+  // Idempotent attempt creation: handle double calls safely and allow restarting expired attempts.
+  // Unique constraint: (job_id, candidate_id)
+  const upsertAttempt = await pool.query(
+    `INSERT INTO dsa_round_attempts (job_id, config_id, candidate_id, status, ends_at, problem_ids)
+     VALUES ($1,$2,$3,'IN_PROGRESS',$4,$5)
+     ON CONFLICT (job_id, candidate_id)
+     DO UPDATE SET
+       config_id = EXCLUDED.config_id,
+       ends_at = CASE
+         WHEN dsa_round_attempts.status = 'SUBMITTED' THEN dsa_round_attempts.ends_at
+         ELSE EXCLUDED.ends_at
+       END,
+       problem_ids = CASE
+         WHEN dsa_round_attempts.status = 'SUBMITTED' THEN dsa_round_attempts.problem_ids
+         ELSE EXCLUDED.problem_ids
+       END,
+       status = CASE
+         WHEN dsa_round_attempts.status = 'SUBMITTED' THEN 'SUBMITTED'
+         ELSE 'IN_PROGRESS'
+       END,
+       updated_at = CURRENT_TIMESTAMP
      RETURNING *`,
-    [job_id, config.id, candidateId, endsAt.toISOString()]
+    [job_id, config.id, candidateId, endsAt.toISOString(), problemIds]
   );
 
-  const attempt = insert.rows[0];
+  const attempt = upsertAttempt.rows[0];
+
+  if (attempt.status === 'SUBMITTED') {
+    throw new AppError('You have already completed this DSA round', 400);
+  }
+
+  if (attempt.status === 'IN_PROGRESS' && existing && existing.status === 'IN_PROGRESS') {
+    return await getStatus(userId, { job_id });
+  }
 
   await ensureRedisConnected();
   const keys = redisKeys(attempt.id);
   await redis.set(keys.status, 'IN_PROGRESS');
-  await redis.set(keys.expiry, attempt.ends_at);
+  await redis.set(keys.expiry, new Date(attempt.ends_at).toISOString());
   // Use TTL so Redis is authoritative on timing.
   const ttlSeconds = Math.max(1, Math.ceil((endsAt.getTime() - Date.now()) / 1000));
   await redis.expire(keys.status, ttlSeconds);
   await redis.expire(keys.expiry, ttlSeconds);
 
-  const problems = await getConfigProblems(config.id);
+  const problems = await getProblemsByIds(problemIds);
 
   const problemsForClient = [];
   for (const p of problems) {
@@ -438,6 +669,8 @@ export const startRound = async (userId, body) => {
     started_at: attempt.started_at,
     ends_at: attempt.ends_at,
     server_time: nowIso(),
+    submitted_problem_ids: [],
+    remaining: Array.isArray(attempt.problem_ids) ? attempt.problem_ids.length : 0,
     problems: problemsForClient,
   };
 };
@@ -458,6 +691,9 @@ export const getStatus = async (userId, query) => {
   if (auto) {
     const res = await pool.query('SELECT * FROM dsa_round_attempts WHERE id = $1', [attempt.id]);
     const submittedAttempt = res.rows[0] || attempt;
+
+    const submittedProblemIds = await getSubmittedProblemIds(submittedAttempt.id);
+    const totalProblems = Array.isArray(submittedAttempt.problem_ids) ? submittedAttempt.problem_ids.length : 0;
     return {
       attempt_id: submittedAttempt.id,
       job_id: submittedAttempt.job_id,
@@ -467,6 +703,8 @@ export const getStatus = async (userId, query) => {
       ends_at: submittedAttempt.ends_at,
       expiry: submittedAttempt.ends_at,
       server_time: nowIso(),
+      submitted_problem_ids: submittedProblemIds,
+      remaining: Math.max(0, totalProblems - submittedProblemIds.length),
     };
   }
 
@@ -478,6 +716,9 @@ export const getStatus = async (userId, query) => {
   const keys = redisKeys(refreshedAttempt.id);
   const [redisStatus, expiry] = await redis.mGet([keys.status, keys.expiry]);
 
+  const submittedProblemIds = await getSubmittedProblemIds(refreshedAttempt.id);
+  const totalProblems = Array.isArray(refreshedAttempt.problem_ids) ? refreshedAttempt.problem_ids.length : 0;
+
   return {
     attempt_id: refreshedAttempt.id,
     job_id: refreshedAttempt.job_id,
@@ -487,6 +728,8 @@ export const getStatus = async (userId, query) => {
     ends_at: refreshedAttempt.ends_at,
     expiry: expiry || refreshedAttempt.ends_at,
     server_time: nowIso(),
+    submitted_problem_ids: submittedProblemIds,
+    remaining: Math.max(0, totalProblems - submittedProblemIds.length),
   };
 };
 
@@ -511,15 +754,34 @@ export const runCode = async (userId, body) => {
 
   await rateLimit(`rl:dsa:run:${candidateId}`, 120, 60);
 
-  const configProblems = await getConfigProblems(attempt.config_id);
-  if (!configProblems.find((p) => p.id === problem_id)) throw new AppError('Problem is not part of this round', 400);
+  const pid = String(problem_id);
+  const allowed = new Set((attempt.problem_ids || []).map((v) => String(v)));
+  if (allowed.size > 0 && !allowed.has(pid)) throw new AppError('Problem is not part of this round', 400);
 
-  const publicTests = await getPublicTestCasesForProblem(problem_id);
-  if (publicTests.length === 0) throw new AppError('No public test cases configured for this problem', 500);
+  await assertProblemNotFinalSubmitted({ attemptId: attempt.id, problemId: pid });
+
+  const publicTests = await getPublicTestCasesForProblem(pid);
+  if (publicTests.length === 0) {
+    const runRes = await judge0.run({ language_id: CPP_LANGUAGE_ID, source_code, stdin: stdin || '' });
+    return {
+      results: [
+        {
+          test_order: 1,
+          status: runRes.status || 'Executed',
+          passed: null,
+          stdout: runRes.stdout || '',
+          stderr: runRes.stderr || '',
+          compile_output: runRes.compile_output || '',
+          time: runRes.time || null,
+          memory: runRes.memory || null,
+        },
+      ],
+    };
+  }
 
   await pool.query(
     `INSERT INTO dsa_round_run_logs (attempt_id, problem_id) VALUES ($1, $2)`,
-    [attempt.id, problem_id]
+    [attempt.id, pid]
   );
 
   const results = [];
@@ -587,12 +849,15 @@ export const saveDraft = async (userId, body) => {
   await ensureNotExpired(attempt);
   if (attempt.status !== 'IN_PROGRESS') throw new AppError('Round is not in progress', 400);
 
-  const configProblems = await getConfigProblems(attempt.config_id);
-  if (!configProblems.find((p) => p.id === problem_id)) throw new AppError('Problem is not part of this round', 400);
+  const pid = String(problem_id);
+  const allowed = new Set((attempt.problem_ids || []).map((v) => String(v)));
+  if (allowed.size > 0 && !allowed.has(pid)) throw new AppError('Problem is not part of this round', 400);
+
+  await assertProblemNotFinalSubmitted({ attemptId: attempt.id, problemId: pid });
 
   await ensureRedisConnected();
   const keys = redisKeys(attempt.id);
-  await redis.hSet(keys.drafts, problem_id, source_code);
+  await redis.hSet(keys.drafts, pid, source_code);
 
   return { saved: true };
 };
@@ -625,48 +890,50 @@ export const submit = async (userId, body) => {
     // If time is over, we still accept submission (manual or auto) but record auto flag.
     const ended = Date.now() > new Date(attempt.ends_at).getTime();
 
-    const configProblems = await client.query(
-      `SELECT problem_id FROM dsa_round_config_problems WHERE config_id = $1`,
-      [attempt.config_id]
-    );
-    const allowedProblemIds = new Set(configProblems.rows.map((r) => r.problem_id));
+    const allowedProblemIds = new Set((attempt.problem_ids || []).map((v) => String(v)));
+    const alreadySubmitted = new Set((await getSubmittedProblemIds(attempt.id, client)).map((v) => String(v)));
 
     for (const s of solutions) {
       if (!s || !s.problem_id || !s.source_code) {
         throw new AppError('Each solution must have problem_id and source_code', 400);
       }
-      if (!allowedProblemIds.has(s.problem_id)) {
+      const pid = String(s.problem_id);
+      if (!allowedProblemIds.has(pid)) {
         throw new AppError('One or more problems are not part of this round', 400);
+      }
+
+      if (alreadySubmitted.has(pid)) {
+        throw new AppError('Problem already submitted', 400);
       }
       validateCodePayload(s.source_code, '');
 
-      // Evaluate ONLY hidden test cases for scoring.
-      const allTests = await getAllTestCasesForProblem(s.problem_id);
+      // Evaluate hidden test cases when available. If not configured, accept submission without scoring.
+      const allTests = await getAllTestCasesForProblem(pid);
       const hidden = allTests.filter((t) => t.is_hidden);
       const totalHidden = hidden.length;
-      if (totalHidden === 0) {
-        throw new AppError('Hidden test cases are not configured for a problem', 500);
-      }
 
       let passedHidden = 0;
-      for (const tc of hidden) {
-        const runRes = await judge0.run({
-          language_id: CPP_LANGUAGE_ID,
-          source_code: s.source_code,
-          stdin: tc.input,
-        });
+      let score = 0;
+      if (totalHidden > 0) {
+        for (const tc of hidden) {
+          const runRes = await judge0.run({
+            language_id: CPP_LANGUAGE_ID,
+            source_code: s.source_code,
+            stdin: tc.input,
+          });
 
-        const expected = normalizeOutput(tc.expected_output);
-        const actual = normalizeOutput(runRes.stdout);
-        const compileFailed = !!runRes.compile_output;
-        const runtimeFailed = !!runRes.stderr && !compileFailed;
-        const judgeAccepted = runRes.status === 'Accepted';
+          const expected = normalizeOutput(tc.expected_output);
+          const actual = normalizeOutput(runRes.stdout);
+          const compileFailed = !!runRes.compile_output;
+          const runtimeFailed = !!runRes.stderr && !compileFailed;
+          const judgeAccepted = runRes.status === 'Accepted';
 
-        const passed = !compileFailed && !runtimeFailed && judgeAccepted && actual === expected;
-        if (passed) passedHidden += 1;
+          const passed = !compileFailed && !runtimeFailed && judgeAccepted && actual === expected;
+          if (passed) passedHidden += 1;
+        }
+
+        score = Math.round((passedHidden / totalHidden) * 100);
       }
-
-      const score = Math.round((passedHidden / totalHidden) * 100);
 
       await client.query(
         `INSERT INTO dsa_round_submissions (
@@ -680,7 +947,7 @@ export const submit = async (userId, body) => {
             passed_hidden = EXCLUDED.passed_hidden,
             total_hidden = EXCLUDED.total_hidden,
             created_at = CURRENT_TIMESTAMP`,
-        [attempt.id, s.problem_id, CPP_LANGUAGE_ID, s.source_code, !!(is_auto || ended), score, passedHidden, totalHidden]
+        [attempt.id, pid, CPP_LANGUAGE_ID, s.source_code, !!(is_auto || ended), score, passedHidden, totalHidden]
       );
     }
 
@@ -694,27 +961,47 @@ export const submit = async (userId, body) => {
       }
     }
 
-    const finalScore = await computeAttemptScore(attempt.id);
-    const timeTakenSeconds = Math.max(0, Math.round((Date.now() - new Date(attempt.started_at).getTime()) / 1000));
+    const submittedProblemIds = await getSubmittedProblemIds(attempt.id, client);
+    const totalProblems = Array.isArray(attempt.problem_ids) ? attempt.problem_ids.length : 0;
+    const allDone = totalProblems > 0 && submittedProblemIds.length >= totalProblems;
 
-    await client.query(
-      `UPDATE dsa_round_attempts
-       SET status = 'SUBMITTED',
-           submitted_at = CURRENT_TIMESTAMP,
-           time_taken_seconds = $2,
-           final_score = $3,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
-      [attempt.id, timeTakenSeconds, finalScore]
-    );
+    if (allDone) {
+      const finalScore = await computeAttemptScore(attempt.id);
+      const timeTakenSeconds = Math.max(0, Math.round((Date.now() - new Date(attempt.started_at).getTime()) / 1000));
+
+      await client.query(
+        `UPDATE dsa_round_attempts
+         SET status = 'SUBMITTED',
+             submitted_at = CURRENT_TIMESTAMP,
+             time_taken_seconds = $2,
+             final_score = $3,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [attempt.id, timeTakenSeconds, finalScore]
+      );
+
+      await client.query('COMMIT');
+
+      await ensureRedisConnected();
+      const keys = redisKeys(attempt.id);
+      await redis.set(keys.status, 'SUBMITTED');
+
+      return {
+        attempt_id: attempt.id,
+        status: 'SUBMITTED',
+        final_score: finalScore,
+        submitted_problem_ids: submittedProblemIds,
+      };
+    }
 
     await client.query('COMMIT');
 
-    await ensureRedisConnected();
-    const keys = redisKeys(attempt.id);
-    await redis.set(keys.status, 'SUBMITTED');
-
-    return { attempt_id: attempt.id, status: 'SUBMITTED', final_score: finalScore };
+    return {
+      attempt_id: attempt.id,
+      status: 'IN_PROGRESS',
+      submitted_problem_ids: submittedProblemIds,
+      remaining: Math.max(0, totalProblems - submittedProblemIds.length),
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
