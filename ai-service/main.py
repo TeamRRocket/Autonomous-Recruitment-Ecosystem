@@ -18,6 +18,23 @@ except Exception as exc:
     # Keep existing APIs running even if resume module dependencies are missing.
     print(f"Resume router failed to load: {exc}")
 
+# Import proctoring module
+try:
+    from ai.proctoring.models import (
+        FrameProcessRequest, 
+        FrameProcessResponse,
+        RiskEvaluationRequest,
+        RiskEvaluationResponse
+    )
+    from ai.proctoring.frame_processor import process_frame
+    from ai.proctoring.risk_evaluator import evaluate_risk
+    
+    PROCTORING_ENABLED = True
+    print("✓ Proctoring module loaded successfully")
+except Exception as exc:
+    PROCTORING_ENABLED = False
+    print(f"⚠ Proctoring module failed to load: {exc}")
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -464,8 +481,57 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "llm_configured": bool(OPENROUTER_API_KEY)
+        "llm_configured": bool(OPENROUTER_API_KEY),
+        "proctoring_enabled": PROCTORING_ENABLED
     }
+
+# ============================================================================
+# PROCTORING ENDPOINTS
+# ============================================================================
+
+if PROCTORING_ENABLED:
+    @app.post("/ai/proctoring/process-frame", response_model=FrameProcessResponse)
+    async def process_frame_endpoint(request: FrameProcessRequest):
+        """
+        Process a single frame with OpenCV for proctoring
+        
+        Detects:
+        - Number of faces
+        - Looking away behavior
+        - Phone presence (placeholder)
+        """
+        try:
+            result = process_frame(request.frame_data)
+            
+            return FrameProcessResponse(
+                face_count=result.get('face_count', 0),
+                looking_away=result.get('looking_away', False),
+                phone_detected=result.get('phone_detected', False),
+                timestamp=result.get('timestamp', '')
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Frame processing error: {str(e)}")
+
+    @app.post("/ai/proctoring/evaluate-risk", response_model=RiskEvaluationResponse)
+    async def evaluate_risk_endpoint(request: RiskEvaluationRequest):
+        """
+        Evaluate proctoring risk using LLM
+        
+        Analyzes aggregated event summary and provides:
+        - Risk score (0-100)
+        - Risk level (Low/Medium/High)
+        - Reasoning explanation
+        """
+        try:
+            result = evaluate_risk(request.summary)
+            
+            return RiskEvaluationResponse(
+                risk_score=result['risk_score'],
+                risk_level=result['risk_level'],
+                reason=result['reason']
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Risk evaluation error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

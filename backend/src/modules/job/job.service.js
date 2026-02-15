@@ -403,6 +403,65 @@ export const getJobScores = async (jobId) => {
         }
     }
 
+    // Proctoring data: fetch sessions with aggregated summaries + application-level risk
+    const proctoringRes = await pool.query(
+        `SELECT ps.candidate_id,
+                ps.id AS session_id,
+                ps.round_type,
+                ps.status AS session_status,
+                ps.created_at AS session_started,
+                ps.ended_at AS session_ended,
+                pas.total_no_face,
+                pas.total_multiple_face,
+                pas.total_looking_away,
+                pas.total_tab_switch,
+                pas.total_window_blur,
+                pas.total_copy_paste,
+                pas.total_phone_detected,
+                pas.longest_looking_away_seconds,
+                pas.risk_score AS session_risk_score,
+                pas.risk_level AS session_risk_level,
+                pas.llm_reason
+         FROM proctoring_sessions ps
+         LEFT JOIN proctoring_aggregated_summaries pas ON pas.session_id = ps.id
+         WHERE ps.job_id = $1 AND ps.candidate_id = ANY($2::uuid[])
+         ORDER BY ps.created_at ASC`,
+        [jobId, candidateIds]
+    );
+
+    const proctoringByCandidate = new Map();
+    for (const row of proctoringRes.rows) {
+        const prev = proctoringByCandidate.get(row.candidate_id) || { sessions: [] };
+        prev.sessions.push({
+            session_id: row.session_id,
+            round_type: row.round_type,
+            status: row.session_status,
+            started_at: row.session_started,
+            ended_at: row.session_ended,
+            total_no_face: Number(row.total_no_face || 0),
+            total_multiple_face: Number(row.total_multiple_face || 0),
+            total_looking_away: Number(row.total_looking_away || 0),
+            total_tab_switch: Number(row.total_tab_switch || 0),
+            total_window_blur: Number(row.total_window_blur || 0),
+            total_copy_paste: Number(row.total_copy_paste || 0),
+            total_phone_detected: Number(row.total_phone_detected || 0),
+            longest_looking_away_seconds: Number(row.longest_looking_away_seconds || 0),
+            risk_score: row.session_risk_score != null ? Number(row.session_risk_score) : null,
+            risk_level: row.session_risk_level || null,
+            llm_reason: row.llm_reason || null
+        });
+        proctoringByCandidate.set(row.candidate_id, prev);
+    }
+
+    // Also get app-level proctoring risk from applications table
+    const appProctoringRes = await pool.query(
+        `SELECT candidate_id, proctoring_risk_score, proctoring_risk_level, proctoring_reason
+         FROM applications
+         WHERE job_id = $1 AND candidate_id = ANY($2::uuid[])`,
+        [jobId, candidateIds]
+    );
+    const appProctoringByCandidate = new Map(appProctoringRes.rows.map((r) => [r.candidate_id, r]));
+
     const candidates = candidatesRes.rows.map((r) => {
         const resume = resumeByCandidate.get(r.candidate_id) || null;
         const apt = aptitudeByCandidate.get(r.candidate_id) || null;
@@ -445,7 +504,18 @@ export const getJobScores = async (jobId) => {
                     avg_score_percent: coding.avg_score,
                     rounds: coding.rounds
                 }
-            }
+            },
+            proctoring: (() => {
+                const proc = proctoringByCandidate.get(r.candidate_id);
+                const appProc = appProctoringByCandidate.get(r.candidate_id);
+                if (!proc && !appProc) return null;
+                return {
+                    sessions: proc?.sessions || [],
+                    overall_risk_score: appProc?.proctoring_risk_score ?? null,
+                    overall_risk_level: appProc?.proctoring_risk_level ?? null,
+                    overall_reason: appProc?.proctoring_reason ?? null
+                };
+            })()
         };
     });
 

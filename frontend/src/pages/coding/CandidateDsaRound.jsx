@@ -4,6 +4,10 @@ import toast from 'react-hot-toast';
 import Editor from '@monaco-editor/react';
 import { getDsaResult, getDsaStatus, runDsa, saveDsaDraft, startDsaRound, submitDsa } from '../../services/dsaService';
 import { getRounds } from '../../services/roundService';
+import useProctoring from '../../hooks/useProctoring';
+import ProctoringConsent from '../../components/proctoring/ProctoringConsent';
+import RecordingIndicator from '../../components/proctoring/RecordingIndicator';
+import proctoringService from '../../services/proctoringService';
 
 const DEFAULT_CPP_TEMPLATE = `#include <bits/stdc++.h>
 using namespace std;
@@ -34,7 +38,7 @@ const CandidateDsaRound = () => {
   });
   const [draggingSplit, setDraggingSplit] = useState(false);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [attemptId, setAttemptId] = useState(null);
   const [status, setStatus] = useState(null);
   const [endsAt, setEndsAt] = useState(null);
@@ -54,6 +58,22 @@ const CandidateDsaRound = () => {
   const [redirected, setRedirected] = useState(false);
 
   const [codeByProblem, setCodeByProblem] = useState({});
+
+  // Proctoring state - check if consent was already given (e.g. from aptitude round)
+  const alreadyConsented = sessionStorage.getItem('proctoring_consent') === 'true';
+  const [showConsent, setShowConsent] = useState(!alreadyConsented);
+  const [consentGiven, setConsentGiven] = useState(alreadyConsented);
+  const [proctoringSessionId, setProctoringSessionId] = useState(null);
+  const [examStarted, setExamStarted] = useState(false);
+
+  // Proctoring hook
+  const {
+    isProctoring,
+    hasWebcamPermission,
+    error: proctoringError,
+    startProctoring,
+    stopProctoring
+  } = useProctoring(proctoringSessionId, examStarted);
 
   const saveTimerRef = useRef(null);
   const lastSavedRef = useRef({});
@@ -141,7 +161,7 @@ const CandidateDsaRound = () => {
       if (document?.fullscreenElement == null && document?.documentElement?.requestFullscreen) {
         const p = document.documentElement.requestFullscreen();
         if (p && typeof p.catch === 'function') {
-          p.catch(() => {});
+          p.catch(() => { });
         }
       }
     } catch {
@@ -175,60 +195,77 @@ const CandidateDsaRound = () => {
     if (redirected) return;
     setRedirected(true);
 
-    try {
-      if (document?.fullscreenElement && document?.exitFullscreen) {
-        document.exitFullscreen();
+    // End proctoring session
+    const endProctoringAndRedirect = async () => {
+      // Clean up proctoring
+      if (proctoringSessionId) {
+        try {
+          await proctoringService.endSession(proctoringSessionId);
+          console.log('✓ Proctoring session ended');
+        } catch (err) {
+          console.error('Failed to end proctoring session:', err);
+        }
       }
-    } catch {
-      // ignore
-    }
-
-    const go = async () => {
-      if (!jobId) {
-        navigate('/applications', { replace: true });
-        return;
-      }
+      stopProctoring(); // Turn off camera - DSA is the last round
+      sessionStorage.removeItem('proctoring_consent'); // Clear consent for next exam
 
       try {
-        const r = await getRounds(jobId);
-        const rounds = Array.isArray(r?.data) ? r.data : [];
-
-        const online = rounds
-          .map((x) => ({
-            round_type: String(x?.round_type || '').toUpperCase(),
-            round_order: Number(x?.round_order),
-          }))
-          .filter((x) => (x.round_type === 'MCQ' || x.round_type === 'CODING') && Number.isFinite(x.round_order))
-          .sort((a, b) => a.round_order - b.round_order);
-
-        const labelFor = (t) => (t === 'MCQ' ? 'APTITUDE' : t === 'CODING' ? 'DSA' : t);
-        const currentLabel = 'DSA';
-        const idx = online.findIndex((x) => labelFor(x.round_type) === currentLabel);
-        const next = idx >= 0 ? online[idx + 1] : null;
-
-        if (!next) {
-          navigate('/applications', { replace: true });
-          return;
-        }
-
-        const nextLabel = labelFor(next.round_type);
-        if (nextLabel === 'APTITUDE') {
-          navigate(`/aptitude/round/${jobId}`, { replace: true });
-          return;
-        }
-        if (nextLabel === 'DSA') {
-          navigate(`/dsa/round/${jobId}`, { replace: true });
-          return;
+        if (document?.fullscreenElement && document?.exitFullscreen) {
+          document.exitFullscreen();
         }
       } catch {
         // ignore
       }
 
-      navigate('/applications', { replace: true });
+      const go = async () => {
+        if (!jobId) {
+          navigate('/applications', { replace: true });
+          return;
+        }
+
+        try {
+          const r = await getRounds(jobId);
+          const rounds = Array.isArray(r?.data) ? r.data : [];
+
+          const online = rounds
+            .map((x) => ({
+              round_type: String(x?.round_type || '').toUpperCase(),
+              round_order: Number(x?.round_order),
+            }))
+            .filter((x) => (x.round_type === 'MCQ' || x.round_type === 'CODING') && Number.isFinite(x.round_order))
+            .sort((a, b) => a.round_order - b.round_order);
+
+          const labelFor = (t) => (t === 'MCQ' ? 'APTITUDE' : t === 'CODING' ? 'DSA' : t);
+          const currentLabel = 'DSA';
+          const idx = online.findIndex((x) => labelFor(x.round_type) === currentLabel);
+          const next = idx >= 0 ? online[idx + 1] : null;
+
+          if (!next) {
+            navigate('/applications', { replace: true });
+            return;
+          }
+
+          const nextLabel = labelFor(next.round_type);
+          if (nextLabel === 'APTITUDE') {
+            navigate(`/aptitude/round/${jobId}`, { replace: true });
+            return;
+          }
+          if (nextLabel === 'DSA') {
+            navigate(`/dsa/round/${jobId}`, { replace: true });
+            return;
+          }
+        } catch {
+          // ignore
+        }
+
+        navigate('/applications', { replace: true });
+      };
+
+      go();
     };
 
-    go();
-  }, [finalResult, redirected, navigate]);
+    endProctoringAndRedirect();
+  }, [finalResult, redirected, navigate, proctoringSessionId, stopProctoring]);
 
   const scheduleSave = (problemId, source) => {
     if (!attemptId || !problemId) return;
@@ -253,6 +290,20 @@ const CandidateDsaRound = () => {
         // Autosave failures should not block the candidate.
       }
     }, 900);
+  };
+
+  // Handle consent acceptance
+  const handleConsentAccept = async () => {
+    setShowConsent(false);
+    setConsentGiven(true);
+    sessionStorage.setItem('proctoring_consent', 'true');
+    await load(); // Start exam after consent
+  };
+
+  // Handle consent decline
+  const handleConsentDecline = () => {
+    toast.error('Camera permission is required to take the exam');
+    navigate('/applications');
   };
 
   const load = async () => {
@@ -282,7 +333,32 @@ const CandidateDsaRound = () => {
         initialCode[pid] = local || p.boilerplate_cpp || DEFAULT_CPP_TEMPLATE;
       }
       setCodeByProblem(initialCode);
+
+      // Start proctoring session (NON-FATAL - exam continues even if proctoring fails)
+      try {
+        const session = await proctoringService.startSession(
+          jobId,
+          'DSA',
+          startRes.data.attempt_id
+        );
+        setProctoringSessionId(session.id);
+
+        // Request camera permission and start proctoring
+        const started = await startProctoring(session.id);
+
+        if (!started) {
+          console.warn('Camera permission denied for DSA proctoring - exam continues without proctoring');
+          toast.warning?.('Camera was not enabled. Exam will continue without proctoring.')
+            || toast.error('Camera was not enabled. Exam will continue without proctoring.');
+        }
+      } catch (err) {
+        console.error('Failed to start proctoring for DSA:', err);
+        // Non-fatal: exam continues without proctoring
+      }
+
+      setExamStarted(true);
     } catch (err) {
+      console.error('Failed to start DSA round:', err);
       toast.error(err.response?.data?.message || 'Failed to start DSA round');
     } finally {
       setLoading(false);
@@ -290,12 +366,14 @@ const CandidateDsaRound = () => {
   };
 
   useEffect(() => {
+    if (!consentGiven) return; // Don't load until consent is given
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId]);
+  }, [jobId, consentGiven]);
 
   useEffect(() => {
     if (!jobId) return;
+    if (!examStarted) return; // Don't poll until exam actually starts
 
     const timer = setInterval(async () => {
       try {
@@ -316,7 +394,7 @@ const CandidateDsaRound = () => {
     }, 3000);
 
     return () => clearInterval(timer);
-  }, [jobId]);
+  }, [jobId, examStarted]);
 
   useEffect(() => {
     if (!activeProblemId) return;
@@ -477,16 +555,29 @@ const CandidateDsaRound = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attemptId, endsAt, finalResult, autoSubmitted, nowTick]);
 
+  // Show consent modal FIRST (before any loading checks)
+  if (showConsent) {
+    return (
+      <ProctoringConsent
+        onAccept={handleConsentAccept}
+        onDecline={handleConsentDecline}
+      />
+    );
+  }
+
   if (loading) {
     return <div className="p-8 text-slate-400">Loading DSA round...</div>;
   }
 
-  if (!problems.length) {
+  if (!problems.length && !loading) {
     return <div className="p-8 text-slate-400">DSA round not available.</div>;
   }
 
   return (
     <div className="h-screen overflow-hidden bg-slate-950 text-slate-100">
+      {/* Recording Indicator */}
+      {isProctoring && <RecordingIndicator />}
+
       <div ref={splitContainerRef} className="w-full px-4 sm:px-6 lg:px-8 py-6 h-full">
         <div className="h-full min-h-0 flex flex-col lg:flex-row gap-6">
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 flex flex-col min-h-0 lg:flex-1" style={{ width: undefined }}>
@@ -578,134 +669,133 @@ const CandidateDsaRound = () => {
                   (() => {
                     const isSubmitted = submittedSet.has(String(p.id));
                     return (
-                  <button
-                    key={p.id}
-                    onClick={() => setActiveProblemId(p.id)}
-                    className={`w-full text-left rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                      p.id === activeProblemId
-                        ? 'bg-indigo-600 text-white'
-                        : isSubmitted
-                          ? 'bg-slate-900 text-slate-500'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span>
-                        {p.problem_order}. {p.title}
-                      </span>
-                      {isSubmitted && (
-                        <span className="text-[10px] uppercase tracking-widest rounded-full border border-slate-700 px-2 py-0.5">
-                          Submitted
-                        </span>
-                      )}
-                    </div>
-                  </button>
+                      <button
+                        key={p.id}
+                        onClick={() => setActiveProblemId(p.id)}
+                        className={`w-full text-left rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${p.id === activeProblemId
+                          ? 'bg-indigo-600 text-white'
+                          : isSubmitted
+                            ? 'bg-slate-900 text-slate-500'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span>
+                            {p.problem_order}. {p.title}
+                          </span>
+                          {isSubmitted && (
+                            <span className="text-[10px] uppercase tracking-widest rounded-full border border-slate-700 px-2 py-0.5">
+                              Submitted
+                            </span>
+                          )}
+                        </div>
+                      </button>
                     );
                   })()
                 ))}
               </div>
             </div>
 
-          {activeProblem && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 min-h-0 flex flex-col">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-200">Editor</h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleRun}
-                    disabled={running || editorReadOnly}
-                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-sm font-semibold disabled:opacity-50"
-                  >
-                    {running ? 'Running…' : 'Run'}
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting || editorReadOnly}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold disabled:opacity-50"
-                  >
-                    {activeProblemSubmitted ? 'Submitted' : submitting ? 'Submitting…' : 'Submit'}
-                  </button>
+            {activeProblem && (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 min-h-0 flex flex-col">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-200">Editor</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRun}
+                      disabled={running || editorReadOnly}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-sm font-semibold disabled:opacity-50"
+                    >
+                      {running ? 'Running…' : 'Run'}
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={submitting || editorReadOnly}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold disabled:opacity-50"
+                    >
+                      {activeProblemSubmitted ? 'Submitted' : submitting ? 'Submitting…' : 'Submit'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <Editor
+                    key={activeProblemId || 'no-problem'}
+                    path={activeProblemId ? `dsa:${jobId}:${activeProblemId}.cpp` : `dsa:${jobId}:no-problem.cpp`}
+                    height="42vh"
+                    language="cpp"
+                    theme="vs-dark"
+                    value={currentCode}
+                    onChange={(value) => setCurrentCode(value ?? '')}
+                    options={{
+                      readOnly: editorReadOnly,
+                      minimap: { enabled: false },
+                      fontSize: 13,
+                      wordWrap: 'on',
+                      scrollBeyondLastLine: false,
+                      automaticLayout: true,
+                    }}
+                  />
+                </div>
+
+                <div className="mt-3">
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Custom Input (stdin)</h3>
+                  <textarea
+                    value={stdin}
+                    onChange={(e) => setStdin(e.target.value)}
+                    className="w-full h-24 rounded-xl bg-slate-950/50 border border-slate-800 p-3 text-xs font-mono text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    spellCheck={false}
+                  />
                 </div>
               </div>
+            )}
 
-              <div className="mt-3">
-                <Editor
-                  key={activeProblemId || 'no-problem'}
-                  path={activeProblemId ? `dsa:${jobId}:${activeProblemId}.cpp` : `dsa:${jobId}:no-problem.cpp`}
-                  height="42vh"
-                  language="cpp"
-                  theme="vs-dark"
-                  value={currentCode}
-                  onChange={(value) => setCurrentCode(value ?? '')}
-                  options={{
-                    readOnly: editorReadOnly,
-                    minimap: { enabled: false },
-                    fontSize: 13,
-                    wordWrap: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                  }}
-                />
+            {runResult && (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                <h3 className="text-sm font-semibold text-slate-200">Run Result</h3>
+                <div className="mt-3 space-y-2">
+                  {(Array.isArray(runResult?.results) ? runResult.results : []).map((tc, i) => (
+                    <div key={i} className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                      <p className="text-xs text-slate-400 uppercase tracking-widest">Test #{tc.test_order}</p>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Status: <span className={`font-semibold ${tc.passed ? 'text-emerald-400' : 'text-rose-400'}`}>{tc.status}</span>
+                      </p>
+                      {tc.compile_output && (
+                        <pre className="mt-2 text-xs text-rose-300 whitespace-pre-wrap">{tc.compile_output}</pre>
+                      )}
+                      {tc.stderr && (
+                        <pre className="mt-2 text-xs text-amber-300 whitespace-pre-wrap">{tc.stderr}</pre>
+                      )}
+                      {tc.stdout && (
+                        <pre className="mt-2 text-xs text-emerald-200 whitespace-pre-wrap">{tc.stdout}</pre>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
+            )}
 
-              <div className="mt-3">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Custom Input (stdin)</h3>
-                <textarea
-                  value={stdin}
-                  onChange={(e) => setStdin(e.target.value)}
-                  className="w-full h-24 rounded-xl bg-slate-950/50 border border-slate-800 p-3 text-xs font-mono text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                  spellCheck={false}
-                />
+            {finalResult && (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                <h3 className="text-sm font-semibold text-slate-200">Final Result</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Status: <span className="text-slate-100 font-semibold">{finalResult.status}</span>
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Final Score: <span className="text-indigo-400 font-bold">{finalResult.final_score}</span>
+                </p>
+                <div className="mt-3 space-y-2">
+                  {(Array.isArray(finalResult?.per_problem) ? finalResult.per_problem : []).map((p, i) => (
+                    <div key={i} className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                      <p className="text-xs text-slate-400 uppercase tracking-widest">Problem {i + 1}</p>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Score: <span className="text-indigo-400 font-bold">{p.score}</span> ({p.passed_hidden}/{p.total_hidden} hidden)
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-
-          {runResult && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-              <h3 className="text-sm font-semibold text-slate-200">Run Result</h3>
-              <div className="mt-3 space-y-2">
-                {(Array.isArray(runResult?.results) ? runResult.results : []).map((tc, i) => (
-                  <div key={i} className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-slate-400 uppercase tracking-widest">Test #{tc.test_order}</p>
-                    <p className="text-xs text-slate-300 mt-1">
-                      Status: <span className={`font-semibold ${tc.passed ? 'text-emerald-400' : 'text-rose-400'}`}>{tc.status}</span>
-                    </p>
-                    {tc.compile_output && (
-                      <pre className="mt-2 text-xs text-rose-300 whitespace-pre-wrap">{tc.compile_output}</pre>
-                    )}
-                    {tc.stderr && (
-                      <pre className="mt-2 text-xs text-amber-300 whitespace-pre-wrap">{tc.stderr}</pre>
-                    )}
-                    {tc.stdout && (
-                      <pre className="mt-2 text-xs text-emerald-200 whitespace-pre-wrap">{tc.stdout}</pre>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {finalResult && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-              <h3 className="text-sm font-semibold text-slate-200">Final Result</h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Status: <span className="text-slate-100 font-semibold">{finalResult.status}</span>
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                Final Score: <span className="text-indigo-400 font-bold">{finalResult.final_score}</span>
-              </p>
-              <div className="mt-3 space-y-2">
-                {(Array.isArray(finalResult?.per_problem) ? finalResult.per_problem : []).map((p, i) => (
-                  <div key={i} className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-                    <p className="text-xs text-slate-400 uppercase tracking-widest">Problem {i + 1}</p>
-                    <p className="text-xs text-slate-300 mt-1">
-                      Score: <span className="text-indigo-400 font-bold">{p.score}</span> ({p.passed_hidden}/{p.total_hidden} hidden)
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
           </div>
         </div>
       </div>

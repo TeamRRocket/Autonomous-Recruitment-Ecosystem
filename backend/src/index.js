@@ -42,6 +42,7 @@ import roundRoutes from './modules/round/round.routes.js';
 import codingRoutes from './modules/coding/coding.routes.js';
 import dsaRoutes from './modules/dsa/dsa.routes.js';
 import aptitudeRoutes from './modules/aptitude/aptitude.routes.js';
+import proctoringRoutes from './modules/proctoring/proctoring.routes.js';
 import resumeRoutes from './routes/resume.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import errorHandler from './middleware/errorHandler.js';
@@ -59,6 +60,7 @@ app.use('/api/rounds', roundRoutes);
 app.use('/api/coding', codingRoutes);
 app.use('/api/dsa', dsaRoutes);
 app.use('/api/aptitude', aptitudeRoutes);
+app.use('/api/proctoring', proctoringRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/recruiter', aiRoutes);
 
@@ -78,6 +80,16 @@ app.use((req, res, next) => {
 // Global Error Handler
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+// Create HTTP server and initialize WebSocket for proctoring
+import http from 'http';
+import { initializeProctoringWebSocket } from './utils/proctoringWebSocket.js';
+
+const server = http.createServer(app);
+
+// Initialize proctoring WebSocket
+initializeProctoringWebSocket(server);
+
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`WebSocket available at ws://localhost:${PORT}/proctoring/ws`);
 });

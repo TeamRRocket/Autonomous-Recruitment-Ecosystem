@@ -75,8 +75,6 @@ const CandidateAptitudeRound = () => {
     const handleConsentAccept = async () => {
         setShowConsent(false);
         setConsentGiven(true);
-        // Save consent so DSA round can skip the consent modal
-        sessionStorage.setItem('proctoring_consent', 'true');
 
         // Start the exam round
         await startExamRound();
@@ -106,11 +104,9 @@ const CandidateAptitudeRound = () => {
                 res.data.attemptId
             );
             setProctoringSessionId(session.id);
-            setExamStarted(true); // Set this BEFORE calling startProctoring
 
             // 3. Request camera permission and start proctoring
-            // Pass sessionId directly to avoid async state update issues
-            const started = await startProctoring(session.id);
+            const started = await startProctoring();
 
             if (!started) {
                 // Camera permission denied - block exam
@@ -139,10 +135,10 @@ const CandidateAptitudeRound = () => {
 
         // NEW: End proctoring session
         const endProctoringAndRedirect = async () => {
-            // End the proctoring session record on backend
             if (proctoringSessionId) {
                 try {
                     await proctoringService.endSession(proctoringSessionId);
+                    stopProctoring(); // Turn off camera
                     console.log('✓ Proctoring session ended');
                 } catch (err) {
                     console.error('Failed to end proctoring session:', err);
@@ -150,8 +146,6 @@ const CandidateAptitudeRound = () => {
             }
 
             if (!jobId) {
-                stopProctoring(); // Turn off camera - no more rounds
-                sessionStorage.removeItem('proctoring_consent');
                 navigate('/applications', { replace: true });
                 return;
             }
@@ -161,8 +155,6 @@ const CandidateAptitudeRound = () => {
                 const rounds = Array.isArray(r?.data) ? r.data : [];
                 const hasCoding = rounds.some((x) => String(x?.round_type || '').toUpperCase() === 'CODING');
                 if (hasCoding) {
-                    // DON'T stop camera - DSA round will take over
-                    stopProctoring();
                     navigate(`/dsa/round/${jobId}`, { replace: true });
                     return;
                 }
@@ -170,8 +162,6 @@ const CandidateAptitudeRound = () => {
                 // if rounds api fails, fallback to applications
             }
 
-            stopProctoring(); // Turn off camera - no more rounds
-            sessionStorage.removeItem('proctoring_consent');
             navigate('/applications', { replace: true });
         };
 
@@ -393,8 +383,8 @@ const CandidateAptitudeRound = () => {
                                                         disabled={readOnly}
                                                         onClick={() => onSelect(q.id, letter)}
                                                         className={`text-left px-4 py-3 rounded-lg border transition-colors ${active
-                                                            ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                                                            : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-slate-700'
+                                                                ? 'bg-indigo-600/20 border-indigo-500 text-white'
+                                                                : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-slate-700'
                                                             } ${readOnly ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                     >
                                                         <span className="font-semibold mr-3 text-slate-400">{letter}</span>
@@ -415,8 +405,8 @@ const CandidateAptitudeRound = () => {
                         disabled={submitting || readOnly}
                         onClick={onSubmit}
                         className={`px-5 py-2 rounded-lg font-semibold ${submitting || readOnly
-                            ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
-                            : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                                ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
+                                : 'bg-indigo-600 hover:bg-indigo-500 text-white'
                             }`}
                     >
                         {submitting ? 'Submitting...' : 'Submit'}

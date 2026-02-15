@@ -449,6 +449,133 @@ const RecruiterScores = () => {
                 </div>
               </div>
 
+              {/* Proctoring Summary */}
+              {row.proctoring && row.proctoring.sessions.length > 0 && (
+                <div className="mt-4 border-t border-slate-800 pt-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 uppercase tracking-widest">Proctoring Summary</span>
+                      {row.proctoring.overall_risk_level && (
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${row.proctoring.overall_risk_level === 'Low'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : row.proctoring.overall_risk_level === 'Medium'
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : row.proctoring.overall_risk_level === 'High'
+                                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                  : 'bg-slate-500/20 text-slate-400 border border-slate-500/30'
+                            }`}
+                        >
+                          {row.proctoring.overall_risk_level} Risk
+                        </span>
+                      )}
+                      {row.proctoring.overall_risk_score != null && (
+                        <span className="text-xs text-slate-400">
+                          Score: <span className="text-white font-semibold">{row.proctoring.overall_risk_score}/100</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Overall reason from LLM */}
+                  {row.proctoring.overall_reason && (
+                    <p className="text-xs text-slate-300 mb-3 bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 leading-relaxed">
+                      {row.proctoring.overall_reason}
+                    </p>
+                  )}
+
+                  {/* Per-session breakdown */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {row.proctoring.sessions.map((session) => {
+                      const hasEvents = session.total_no_face > 0 || session.total_multiple_face > 0 || session.total_looking_away > 0 || session.total_tab_switch > 0 || session.total_window_blur > 0 || session.total_copy_paste > 0 || session.total_phone_detected > 0;
+                      const cheatingDetected = session.risk_level === 'High' || session.total_phone_detected > 0 || session.total_multiple_face > 2;
+
+                      return (
+                        <div key={session.session_id} className="bg-slate-950/50 border border-slate-800 rounded-xl p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-slate-300 uppercase">{session.round_type} Round</span>
+                            <div className="flex items-center gap-2">
+                              {cheatingDetected ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                                  ⚠ Suspicious
+                                </span>
+                              ) : hasEvents ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                  Minor Issues
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                  ✓ Clean
+                                </span>
+                              )}
+                              {session.risk_score != null && (
+                                <span className="text-[10px] text-slate-500">{session.risk_score}/100</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {hasEvents && (
+                            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                              {session.total_no_face > 0 && (
+                                <div className="flex justify-between text-slate-400">
+                                  <span>No Face</span>
+                                  <span className="text-white font-medium">{session.total_no_face}</span>
+                                </div>
+                              )}
+                              {session.total_multiple_face > 0 && (
+                                <div className="flex justify-between text-slate-400">
+                                  <span>Multiple Faces</span>
+                                  <span className="text-red-400 font-medium">{session.total_multiple_face}</span>
+                                </div>
+                              )}
+                              {session.total_looking_away > 0 && (
+                                <div className="flex justify-between text-slate-400">
+                                  <span>Looking Away</span>
+                                  <span className="text-white font-medium">{session.total_looking_away}</span>
+                                </div>
+                              )}
+                              {session.total_tab_switch > 0 && (
+                                <div className="flex justify-between text-slate-400">
+                                  <span>Tab Switches</span>
+                                  <span className="text-amber-400 font-medium">{session.total_tab_switch}</span>
+                                </div>
+                              )}
+                              {session.total_phone_detected > 0 && (
+                                <div className="flex justify-between text-slate-400">
+                                  <span>Phone Detected</span>
+                                  <span className="text-red-400 font-medium">{session.total_phone_detected}</span>
+                                </div>
+                              )}
+                              {session.total_copy_paste > 0 && (
+                                <div className="flex justify-between text-slate-400">
+                                  <span>Copy/Paste</span>
+                                  <span className="text-amber-400 font-medium">{session.total_copy_paste}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {!hasEvents && (
+                            <p className="text-[11px] text-slate-500">No suspicious activity detected</p>
+                          )}
+
+                          {session.llm_reason && (
+                            <p className="text-[10px] text-slate-400 mt-2 italic leading-relaxed">{session.llm_reason}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* No Proctoring Data */}
+              {(!row.proctoring || row.proctoring.sessions.length === 0) && (
+                <div className="mt-4 border-t border-slate-800 pt-3">
+                  <span className="text-xs text-slate-600 uppercase tracking-widest">Proctoring: No data yet</span>
+                </div>
+              )}
+
               {insightsByCandidateId.has(row.candidate.id) && (
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <div className="text-xs text-slate-400">
@@ -461,9 +588,9 @@ const RecruiterScores = () => {
                     <span className="text-white font-semibold">
                       {Number(
                         insightsByCandidateId.get(row.candidate.id)?.final_score ??
-                          insightsByCandidateId.get(row.candidate.id)?.total_score ??
-                          insightsByCandidateId.get(row.candidate.id)?.resume_score ??
-                          0
+                        insightsByCandidateId.get(row.candidate.id)?.total_score ??
+                        insightsByCandidateId.get(row.candidate.id)?.resume_score ??
+                        0
                       ).toFixed(1)}
                     </span>
                   </div>
@@ -511,9 +638,9 @@ const RecruiterScores = () => {
                 <p className="text-white font-semibold">
                   {Number(
                     selectedInsight.final_score ??
-                      selectedInsight.total_score ??
-                      selectedInsight.resume_score ??
-                      0
+                    selectedInsight.total_score ??
+                    selectedInsight.resume_score ??
+                    0
                   ).toFixed(1)}
                 </p>
               </div>
@@ -543,11 +670,11 @@ const RecruiterScores = () => {
               </div>
 
               <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
-              {isSelectionLocked && (
-                <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-300">
-                  Selection is locked until: <span className="text-white font-semibold">{new Date(selectionLockUntil).toLocaleString()}</span>
-                </div>
-              )}
+                {isSelectionLocked && (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-300">
+                    Selection is locked until: <span className="text-white font-semibold">{new Date(selectionLockUntil).toLocaleString()}</span>
+                  </div>
+                )}
                 <p className="text-xs text-slate-500 uppercase tracking-widest">Gaps</p>
                 <div className="mt-2 space-y-2">
                   {(selectedInsight.gaps || []).length > 0 ? (
