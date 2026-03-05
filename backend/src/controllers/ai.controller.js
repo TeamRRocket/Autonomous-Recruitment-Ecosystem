@@ -1,6 +1,7 @@
 import { pool } from '../config/db.js';
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/AppError.js';
+import { rankJobApplications } from '../modules/resume/resumeRanking.service.js';
 
 export const rankCandidates = catchAsync(async (req, res, next) => {
   const recruiterUserId = req.user.id;
@@ -20,19 +21,25 @@ export const rankCandidates = catchAsync(async (req, res, next) => {
 
   const job = jobResult.rows[0];
 
-  if (job.status !== 'CLOSED') {
-    return next(new AppError('Ranking is available only after the job is CLOSED', 400));
+  // Allow ranking for PUBLISHED or CLOSED jobs
+  if (job.status !== 'PUBLISHED' && job.status !== 'CLOSED') {
+    return next(new AppError('Ranking is only available for published or closed jobs', 400));
   }
 
+  // Trigger ranking calculation based on resume scores
+  await rankJobApplications(jobId);
+
+  // Fetch ranked results
   const rankedRes = await pool.query(
     `SELECT a.candidate_id,
             cp.full_name AS name,
             a.resume_score,
-            a.rank
+            a.rank,
+            a.resume_score_breakdown,
+            a.resume_summary
      FROM applications a
      JOIN candidate_profiles cp ON a.candidate_id = cp.id
      WHERE a.job_id = $1
-       AND a.stage = 'applied'
        AND a.resume_score IS NOT NULL
        AND a.rank IS NOT NULL
      ORDER BY a.rank ASC`,

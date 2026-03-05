@@ -129,13 +129,15 @@ class YOLOFrameProcessor:
             offset_y = abs(face_center_y - frame_center_y) / (h / 2)
             
             # If face is too far from center, likely looking away
-            # Threshold: > 0.55 means face center is >55% away from frame center
-            if offset_x > 0.55 or offset_y > 0.6:
+            # More sensitive thresholds for better detection
+            if offset_x > 0.45 or offset_y > 0.5:
+                print(f"👁️ Looking away detected (offset_x: {offset_x:.2f}, offset_y: {offset_y:.2f})")
                 return True
             
             # Also check if face is very small (far from camera = potentially looking away)
             face_area_ratio = (fw * fh) / (w * h)
-            if face_area_ratio < 0.02:  # Face is less than 2% of frame
+            if face_area_ratio < 0.03:  # Face is less than 3% of frame
+                print(f"👁️ Looking away detected (small face: {face_area_ratio:.3f})")
                 return True
             
             return False
@@ -154,10 +156,11 @@ class YOLOFrameProcessor:
         
         try:
             # Detect cell phones and books (potential cheat sheets)
+            # Using lower confidence threshold for more sensitive detection
             results = self.model(
                 img, 
                 verbose=False, 
-                conf=0.35,  # Lower confidence threshold for phone detection
+                conf=0.2,  # Lower confidence threshold for better phone detection
                 classes=[self.CELL_PHONE_CLASS, self.BOOK_CLASS]
             )
             
@@ -166,12 +169,12 @@ class YOLOFrameProcessor:
                     cls_id = int(box.cls[0])
                     conf = float(box.conf[0])
                     
-                    if cls_id == self.CELL_PHONE_CLASS and conf > 0.35:
+                    if cls_id == self.CELL_PHONE_CLASS and conf > 0.2:
                         print(f"📱 Phone detected with confidence: {conf:.2f}")
                         return True
                     
-                    if cls_id == self.BOOK_CLASS and conf > 0.5:
-                        # Books need higher confidence to avoid false positives
+                    if cls_id == self.BOOK_CLASS and conf > 0.4:
+                        # Books need slightly higher confidence to avoid false positives
                         print(f"📖 Book/cheat sheet detected with confidence: {conf:.2f}")
                         return True
             

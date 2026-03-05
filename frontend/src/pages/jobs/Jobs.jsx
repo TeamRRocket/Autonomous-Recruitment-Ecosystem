@@ -17,30 +17,30 @@ import {
 import toast from 'react-hot-toast';
 
 const FilterAccordion = ({ title, children, isOpen, onToggle }) => (
-    <div className="border-b border-slate-800">
+    <div className="border-b border-border">
         <button
             onClick={onToggle}
-            className="w-full py-4 flex items-center justify-between text-slate-200 hover:text-white transition-colors"
+            className="w-full py-4 flex items-center justify-between text-foreground hover:text-primary transition-colors"
         >
-            <span className="text-sm font-bold tracking-tight">{title}</span>
-            {isOpen ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+            <span className="text-sm font-bold tracking-tight font-heading">{title}</span>
+            {isOpen ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
         </button>
-        {isOpen && <div className="pb-6 animate-in fade-in slide-in-from-top-1 duration-200">{children}</div>}
+        {isOpen && <div className="pb-6 animate-fade-in">{children}</div>}
     </div>
 );
 
 const CheckboxFilter = ({ label, count, checked, onChange }) => (
     <label className="flex items-center group cursor-pointer py-1.5">
         <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${checked
-            ? 'bg-blue-600 border-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]'
-            : 'bg-slate-900 border-slate-700 group-hover:border-slate-500'
+            ? 'bg-primary border-primary shadow-sm'
+            : 'bg-input border-border group-hover:border-primary/50'
             }`}>
             {checked && <CheckCircle2 size={10} className="text-white fill-white" />}
         </div>
-        <span className={`ml-3 text-sm transition-colors ${checked ? 'text-white font-medium' : 'text-slate-400 group-hover:text-slate-300'}`}>
+        <span className={`ml-3 text-sm transition-colors ${checked ? 'text-foreground font-medium' : 'text-muted-foreground group-hover:text-foreground'}`}>
             {label}
         </span>
-        {count !== undefined && <span className="ml-auto text-xs text-slate-500 font-medium">{count}</span>}
+        {count !== undefined && <span className="ml-auto text-xs text-muted-foreground font-medium">{count}</span>}
         <input type="checkbox" className="hidden" checked={checked} onChange={onChange} />
     </label>
 );
@@ -136,30 +136,30 @@ const Jobs = () => {
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
-                <p className="text-slate-400 font-medium animate-pulse text-sm uppercase tracking-widest">Searching Opportunities...</p>
+                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                <p className="text-muted-foreground font-medium animate-pulse text-sm uppercase tracking-widest">Searching Opportunities...</p>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col lg:flex-row gap-10 min-h-screen bg-slate-950 px-4 md:px-8 py-8 animate-in fade-in duration-700">
+        <div className="flex flex-col lg:flex-row gap-10 min-h-screen px-4 md:px-8 py-8 animate-fade-in">
             {/* Sidebar Filters */}
             <aside className="w-full lg:w-72 flex-shrink-0 space-y-6">
                 <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Filter size={18} className="text-blue-500" />
+                    <h2 className="text-xl font-bold font-heading text-foreground flex items-center gap-2">
+                        <Filter size={18} className="text-primary" />
                         Filters
                     </h2>
                     <button
                         onClick={clearFilters}
-                        className="text-[11px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-wider transition-colors"
+                        className="text-[11px] font-bold text-primary hover:text-primary/80 uppercase tracking-wider transition-colors"
                     >
                         Clear all
                     </button>
                 </div>
 
-                <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 backdrop-blur-md">
+                <div className="glass-card p-6">
                     <div className="space-y-2">
                         <FilterAccordion
                             title="Locations"
@@ -197,16 +197,16 @@ const Jobs = () => {
                             onToggle={() => toggleFilterSection('skills')}
                         >
                             <div className="relative mb-4 group">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-blue-500 transition-colors" size={14} />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={14} />
                                 <input
                                     type="text"
                                     placeholder="e.g. Finance, Coding"
-                                    className="w-full bg-slate-950/50 border border-slate-800 rounded-xl py-2 pl-9 pr-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all font-medium"
+                                    className="w-full bg-input border border-border rounded-lg py-2 pl-9 pr-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all font-medium"
                                     value={skillSearch}
                                     onChange={(e) => setSkillSearch(e.target.value)}
                                 />
                             </div>
-                            <p className="text-[10px] text-slate-500 italic px-1">Tip: Filter by specific skills you possess.</p>
+                            <p className="text-[10px] text-muted-foreground italic px-1">Tip: Filter by specific skills you possess.</p>
                         </FilterAccordion>
 
                         <FilterAccordion
@@ -262,7 +262,7 @@ const Jobs = () => {
                 {/* Search Bar */}
                 <div className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-3 shadow-xl backdrop-blur-md">
                     <div className="relative group">
-                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
+                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors" size={20} />
                         <input
                             type="text"
                             placeholder="What do you want to do?"
@@ -298,12 +298,12 @@ const Jobs = () => {
                         filteredJobs.map((job) => (
                             <div
                                 key={job.id}
-                                className="bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden hover:border-blue-500/30 transition-all duration-300 group shadow-lg"
+                                className="bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden hover:border-primary/30 transition-all duration-300 group shadow-lg"
                             >
                                 <div className="p-8 pb-4">
                                     <div className="flex justify-between items-start mb-6">
                                         <div className="space-y-1">
-                                            <h3 className="text-2xl font-bold text-white group-hover:text-blue-400 transition-colors cursor-pointer">
+                                            <h3 className="text-2xl font-bold text-white group-hover:text-primary transition-colors cursor-pointer">
                                                 {job.title}
                                             </h3>
                                             <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-400">
@@ -341,12 +341,12 @@ const Jobs = () => {
                                         <ul className="space-y-2.5">
                                             {(job.requirements || []).slice(0, 3).map((req, i) => (
                                                 <li key={i} className="flex items-start text-sm text-slate-400 leading-relaxed">
-                                                    <span className="mr-3 mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500/50 shrink-0"></span>
+                                                    <span className="mr-3 mt-1.5 w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0"></span>
                                                     {req}
                                                 </li>
                                             ))}
                                             {(job.requirements || []).length > 3 && (
-                                                <li className="text-xs text-blue-400 font-bold ml-4.5 cursor-pointer hover:underline">
+                                                <li className="text-xs text-primary font-bold ml-4.5 cursor-pointer hover:underline">
                                                     + {(job.preferred_qualifications?.length || 0) + (job.requirements.length - 3)} more qualifications
                                                 </li>
                                             )}
@@ -358,7 +358,7 @@ const Jobs = () => {
                                     <div className="flex items-center gap-4">
                                         <a
                                             href={`/jobs/${job.id}`}
-                                            className="px-6 py-2.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 rounded-xl text-sm font-bold transition-all"
+                                            className="px-6 py-2.5 bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/20 rounded-xl text-sm font-bold transition-all"
                                         >
                                             Learn more
                                         </a>

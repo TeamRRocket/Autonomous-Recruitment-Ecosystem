@@ -228,17 +228,11 @@ class ProctoringService {
                 llm_reason: reason
             });
 
-            // Update application with proctoring scores
+            // Update application with combined proctoring scores from all sessions
             const session = await proctoringRepository.getSessionById(sessionId);
             if (session) {
-                await proctoringRepository.updateApplicationProctoring(
-                    session.job_id,
-                    session.candidate_id,
-                    risk_score,
-                    risk_level,
-                    reason
-                );
-                console.log(`✓ Application updated with proctoring scores for session ${sessionId}`);
+                await this.updateApplicationOverallRisk(session.job_id, session.candidate_id);
+                console.log(`✓ Application updated with combined proctoring scores`);
             }
 
             console.log(`✓ LLM risk evaluation completed for session ${sessionId}: ${risk_level} (${risk_score})`);
@@ -290,19 +284,114 @@ class ProctoringService {
             llm_reason: reason
         });
 
-        // Update application
+        // Update application with combined risk from all sessions
         const session = await proctoringRepository.getSessionById(sessionId);
         if (session) {
-            await proctoringRepository.updateApplicationProctoring(
-                session.job_id,
-                session.candidate_id,
-                riskScore,
-                riskLevel,
-                reason
-            );
+            await this.updateApplicationOverallRisk(session.job_id, session.candidate_id);
         }
 
         console.log(`✓ Fallback risk score calculated for session ${sessionId}: ${riskLevel} (${riskScore})`);
+    }
+
+    /**
+     * Update application with combined risk from all sessions
+     */
+    async updateApplicationOverallRisk(jobId, candidateId) {
+        try {
+            // Get all sessions for this application
+            const { pool } = await import('../../config/db.js');
+            const sessionsQuery = `
+                SELECT ps.id, pas.total_no_face, pas.total_multiple_face, pas.total_looking_away,
+                       pas.total_tab_switch, pas.total_window_blur, pas.total_copy_paste,
+                       pas.total_phone_detected, pas.risk_score, pas.risk_level, pas.llm_reason
+                FROM proctoring_sessions ps
+                LEFT JOIN proctoring_aggregated_summaries pas ON pas.session_id = ps.id
+                WHERE ps.job_id = $1 AND ps.candidate_id = $2 AND ps.status = 'COMPLETED'
+            `;
+            const result = await pool.query(sessionsQuery, [jobId, candidateId]);
+            
+            if (result.rows.length === 0) {
+                console.log('No completed sessions found for combined risk calculation');
+                return;
+            }
+
+            // Combine all event counts from all sessions
+            const combined = {
+                total_no_face: 0,
+                total_multiple_face: 0,
+                total_looking_away: 0,
+                total_tab_switch: 0,
+                total_window_blur: 0,
+                total_copy_paste: 0,
+                total_phone_detected: 0
+            };
+
+            for (const row of result.rows) {
+                combined.total_no_face += Number(row.total_no_face || 0);
+                combined.total_multiple_face += Number(row.total_multiple_face || 0);
+                combined.total_looking_away += Number(row.total_looking_away || 0);
+                combined.total_tab_switch += Number(row.total_tab_switch || 0);
+                combined.total_window_blur += Number(row.total_window_blur || 0);
+                combined.total_copy_paste += Number(row.total_copy_paste || 0);
+                combined.total_phone_detected += Number(row.total_phone_detected || 0);
+            }
+
+            // Calculate combined risk score (using increased weights)
+            let overallRiskScore = 0;
+            const concerns = [];
+
+            if (combined.total_no_face > 0) {
+                overallRiskScore += combined.total_no_face * 8;
+                concerns.push(`face absent ${combined.total_no_face} times`);
+            }
+            if (combined.total_multiple_face > 0) {
+                overallRiskScore += combined.total_multiple_face * 15;
+                concerns.push(`multiple faces ${combined.total_multiple_face} times`);
+            }
+            if (combined.total_looking_away > 0) {
+                overallRiskScore += combined.total_looking_away * 3;
+                concerns.push(`looking away ${combined.total_looking_away} times`);
+            }
+            if (combined.total_tab_switch > 0) {
+                overallRiskScore += combined.total_tab_switch * 10;
+                concerns.push(`${combined.total_tab_switch} tab switches`);
+            }
+            if (combined.total_window_blur > 0) {
+                overallRiskScore += combined.total_window_blur * 4;
+                concerns.push(`${combined.total_window_blur} window blur events`);
+            }
+            if (combined.total_copy_paste > 0) {
+                overallRiskScore += combined.total_copy_paste * 20;
+                concerns.push(`${combined.total_copy_paste} copy/paste attempts`);
+            }
+            if (combined.total_phone_detected > 0) {
+                overallRiskScore += combined.total_phone_detected * 25;
+                concerns.push(`phone detected ${combined.total_phone_detected} times`);
+            }
+
+            overallRiskScore = Math.min(100, overallRiskScore);
+
+            let overallRiskLevel = 'Low';
+            if (overallRiskScore >= 70) overallRiskLevel = 'High';
+            else if (overallRiskScore >= 40) overallRiskLevel = 'Medium';
+
+            const overallReason = concerns.length === 0
+                ? 'No violations were detected based on the provided behavioral indicators. The candidate did not leave, avoid the camera, look away, switch tabs, attempt copy/paste, or have a phone detected.'
+                : `Overall assessment across all exam rounds: ${concerns.join(', ')}. Combined risk evaluation based on cumulative violations.`;
+
+            // Update application table with combined risk
+            await proctoringRepository.updateApplicationProctoring(
+                jobId,
+                candidateId,
+                overallRiskScore,
+                overallRiskLevel,
+                overallReason
+            );
+
+            console.log(`✓ Combined proctoring risk updated: ${overallRiskLevel} (${overallRiskScore}/100) - Sessions: ${result.rows.length}`);
+        } catch (error) {
+            console.error('Error updating application overall risk:', error);
+        }
     }
 
     /**

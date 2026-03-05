@@ -59,10 +59,10 @@ const CandidateDsaRound = () => {
 
   const [codeByProblem, setCodeByProblem] = useState({});
 
-  // Proctoring state - check if consent was already given (e.g. from aptitude round)
+  // Proctoring is optional - start exam immediately if consent was given previously
   const alreadyConsented = sessionStorage.getItem('proctoring_consent') === 'true';
-  const [showConsent, setShowConsent] = useState(!alreadyConsented);
-  const [consentGiven, setConsentGiven] = useState(alreadyConsented);
+  const [showConsent, setShowConsent] = useState(false); // Don't block with consent modal
+  const [consentGiven, setConsentGiven] = useState(true); // Always allow exam to start
   const [proctoringSessionId, setProctoringSessionId] = useState(null);
   const [examStarted, setExamStarted] = useState(false);
 
@@ -156,18 +156,7 @@ const CandidateDsaRound = () => {
     };
   }, [draggingSplit]);
 
-  useEffect(() => {
-    try {
-      if (document?.fullscreenElement == null && document?.documentElement?.requestFullscreen) {
-        const p = document.documentElement.requestFullscreen();
-        if (p && typeof p.catch === 'function') {
-          p.catch(() => { });
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+  // Fullscreen removed - can only be triggered by user gesture, not automatically
 
   useEffect(() => {
     if (!attemptId) return;
@@ -297,13 +286,13 @@ const CandidateDsaRound = () => {
     setShowConsent(false);
     setConsentGiven(true);
     sessionStorage.setItem('proctoring_consent', 'true');
-    await load(); // Start exam after consent
   };
 
-  // Handle consent decline
+  // Handle consent decline - allow exam without proctoring
   const handleConsentDecline = () => {
-    toast.error('Camera permission is required to take the exam');
-    navigate('/applications');
+    setShowConsent(false);
+    setConsentGiven(true); // Allow exam to proceed without proctoring
+    toast.warning('Continuing without proctoring');
   };
 
   const load = async () => {
@@ -334,42 +323,56 @@ const CandidateDsaRound = () => {
       }
       setCodeByProblem(initialCode);
 
-      // Start proctoring session (NON-FATAL - exam continues even if proctoring fails)
-      try {
-        const session = await proctoringService.startSession(
-          jobId,
-          'DSA',
-          startRes.data.attempt_id
-        );
-        setProctoringSessionId(session.id);
+      // Start proctoring session if consent was given (NON-FATAL - exam continues without it)
+      if (alreadyConsented) {
+        try {
+          const session = await proctoringService.startSession(
+            jobId,
+            'DSA',
+            startRes.data.attempt_id
+          );
+          setProctoringSessionId(session.id);
 
-        // Request camera permission and start proctoring
-        const started = await startProctoring(session.id);
+          // Request camera permission and start proctoring
+          const started = await startProctoring(session.id);
 
-        if (!started) {
-          console.warn('Camera permission denied for DSA proctoring - exam continues without proctoring');
-          toast.warning?.('Camera was not enabled. Exam will continue without proctoring.')
-            || toast.error('Camera was not enabled. Exam will continue without proctoring.');
+          if (!started) {
+            console.warn('Camera permission denied for DSA proctoring - exam continues without proctoring');
+          }
+        } catch (err) {
+          console.error('Failed to start proctoring for DSA:', err);
+          // Non-fatal: exam continues without proctoring
         }
-      } catch (err) {
-        console.error('Failed to start proctoring for DSA:', err);
-        // Non-fatal: exam continues without proctoring
       }
 
       setExamStarted(true);
     } catch (err) {
       console.error('Failed to start DSA round:', err);
-      toast.error(err.response?.data?.message || 'Failed to start DSA round');
+      const errorMsg = err.response?.data?.message || 'Failed to start DSA round';
+      toast.error(errorMsg);
+      
+      // Show error in UI instead of navigating away
+      setLoading(false);
+      setProblems([]);
+      
+      // If it's a prerequisite error (403), show helpful message
+      if (err.response?.status === 403) {
+        setTimeout(() => {
+          toast.error('Please complete the Aptitude round first', { duration: 5000 });
+          setTimeout(() => navigate('/applications'), 2000);
+        }, 1000);
+      } else {
+        setTimeout(() => navigate('/applications'), 3000);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!consentGiven) return; // Don't load until consent is given
-    load();
+    load(); // Start immediately without waiting for consent
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, consentGiven]);
+  }, [jobId]);
 
   useEffect(() => {
     if (!jobId) return;

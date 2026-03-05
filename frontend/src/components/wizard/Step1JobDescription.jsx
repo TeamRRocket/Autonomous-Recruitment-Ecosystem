@@ -166,13 +166,13 @@ const Step1JobDescription = ({ formData, setFormData, onNext }) => {
             />
 
             <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">
-                    Minimum Qualifications / Responsibilities <span className="text-red-400">*</span>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                    Minimum Qualifications / Responsibilities <span className="text-destructive">*</span>
                 </label>
                 <div className="flex gap-2 mb-2">
                     <input
                         type="text"
-                        className="input-field flex-1 bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:ring-blue-500 focus:border-blue-500 block sm:text-sm rounded-lg p-2.5"
+                        className="input-field flex-1 bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring focus:border-ring block sm:text-sm rounded-lg p-2.5"
                         placeholder="Add a minimum qualification..."
                         value={currentResp}
                         onChange={(e) => setCurrentResp(e.target.value)}
@@ -181,19 +181,19 @@ const Step1JobDescription = ({ formData, setFormData, onNext }) => {
                     <button
                         type="button"
                         onClick={addResponsibility}
-                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center"
+                        className="px-4 py-2 bg-accent hover:bg-accent/80 text-foreground rounded-lg transition-colors flex items-center border border-border"
                     >
                         <Plus size={18} />
                     </button>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
                     {localData.responsibilities.map((resp, idx) => (
-                        <div key={idx} className="flex items-center bg-blue-500/10 border border-blue-500/30 text-blue-300 px-3 py-1.5 rounded-lg text-sm">
+                        <div key={idx} className="flex items-center bg-primary/10 border border-primary/30 text-primary px-3 py-1.5 rounded-lg text-sm">
                             <span>{resp}</span>
                             <button
                                 type="button"
                                 onClick={() => removeResponsibility(resp)}
-                                className="ml-2 text-blue-400 hover:text-white"
+                                className="ml-2 text-primary hover:text-foreground"
                             >
                                 <X size={14} />
                             </button>
@@ -203,13 +203,13 @@ const Step1JobDescription = ({ formData, setFormData, onNext }) => {
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                     Preferred Qualifications
                 </label>
                 <div className="flex gap-2 mb-2">
                     <input
                         type="text"
-                        className="input-field flex-1 bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:ring-blue-500 focus:border-blue-500 block sm:text-sm rounded-lg p-2.5"
+                        className="input-field flex-1 bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring focus:border-ring block sm:text-sm rounded-lg p-2.5"
                         placeholder="Add a preferred qualification (optional)..."
                         value={currentPref}
                         onChange={(e) => setCurrentPref(e.target.value)}
@@ -218,19 +218,19 @@ const Step1JobDescription = ({ formData, setFormData, onNext }) => {
                     <button
                         type="button"
                         onClick={addPreferredQual}
-                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center"
+                        className="px-4 py-2 bg-accent hover:bg-accent/80 text-foreground rounded-lg transition-colors flex items-center border border-border"
                     >
                         <Plus size={18} />
                     </button>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
                     {localData.preferred_qualifications.map((qual, idx) => (
-                        <div key={idx} className="flex items-center bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 px-3 py-1.5 rounded-lg text-sm">
+                        <div key={idx} className="flex items-center bg-secondary/10 border border-secondary/30 text-secondary px-3 py-1.5 rounded-lg text-sm">
                             <span>{qual}</span>
                             <button
                                 type="button"
                                 onClick={() => removePreferredQual(qual)}
-                                className="ml-2 text-indigo-400 hover:text-white"
+                                className="ml-2 text-secondary hover:text-foreground"
                             >
                                 <X size={14} />
                             </button>
@@ -252,9 +252,10 @@ const Step1JobDescription = ({ formData, setFormData, onNext }) => {
                 <button
                     onClick={handleContinue}
                     disabled={!isFormValid()}
-                    className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 ${isFormValid()
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                    className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 ${
+                        isFormValid()
+                        ? 'gradient-primary text-white shadow-lg hover:opacity-90'
+                        : 'bg-accent text-muted-foreground cursor-not-allowed border border-border'
                         }`}
                 >
                     Continue to Rounds Selection

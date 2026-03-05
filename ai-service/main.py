@@ -1,15 +1,39 @@
 import os
+import sys
+
+# Suppress all warnings at the earliest possible point
+import warnings
+warnings.filterwarnings('ignore')
+os.environ['PYTHONWARNINGS'] = 'ignore'
+
 import json
 import requests
+import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Set
 from dotenv import load_dotenv
 from dataclasses import dataclass
 
+# Additional warning suppression for specific libraries
+warnings.filterwarnings('ignore', category=Warning)
+warnings.filterwarnings('ignore', message='.*urllib3.*')
+warnings.filterwarnings('ignore', message='.*FontBBox.*')
+logging.getLogger('pdfminer').setLevel(logging.ERROR)
+logging.getLogger('pdfplumber').setLevel(logging.ERROR)
+
 load_dotenv()
 
-app = FastAPI(title="HireFlow AI - Hybrid Matching Service")
+# Import config and utilities
+from ai.config import config
+from ai.utils import parse_json_response, call_llm_api
+from ai.utils.llm_client import extract_llm_content
+from ai.matching import SkillMatcher
+
+app = FastAPI(
+    title=config.APP_TITLE,
+    version=config.APP_VERSION
+)
 
 try:
     from ai.api.resume_routes import router as resume_router
@@ -29,14 +53,11 @@ try:
     from ai.proctoring.frame_processor import process_frame
     from ai.proctoring.risk_evaluator import evaluate_risk
     
-    PROCTORING_ENABLED = True
+    config.PROCTORING_ENABLED = True
     print("✓ Proctoring module loaded successfully")
-except Exception as exc:
-    PROCTORING_ENABLED = False
-    print(f"⚠ Proctoring module failed to load: {exc}")
-
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+except Exception:
+    # Proctoring is optional - silently disable if cv2 not installed
+    config.PROCTORING_ENABLED = False
 
 # ============================================================================
 # MODELS
@@ -81,186 +102,6 @@ class SkillMatch:
     candidate_skills: List[str]
 
 # ============================================================================
-# SKILL NORMALIZATION & MATCHING ENGINE
-# ============================================================================
-
-class SkillMatcher:
-    """Rule-based skill matching and normalization"""
-    
-    # Skill aliases and equivalents
-    SKILL_ALIASES = {
-        'js': 'javascript',
-        'javascript': 'javascript',
-        'node': 'nodejs',
-        'nodejs': 'nodejs',
-        'node.js': 'nodejs',
-        'py': 'python',
-        'python': 'python',
-        'react.js': 'react',
-        'reactjs': 'react',
-        'react': 'react',
-        'ml': 'machine learning',
-        'machine learning': 'machine learning',
-        'ai': 'artificial intelligence',
-        'artificial intelligence': 'artificial intelligence',
-        'postgres': 'postgresql',
-        'postgresql': 'postgresql',
-        'mongo': 'mongodb',
-        'mongodb': 'mongodb',
-        'k8s': 'kubernetes',
-        'kubernetes': 'kubernetes',
-        'aws': 'amazon web services',
-        'amazon web services': 'amazon web services',
-        'gcp': 'google cloud',
-        'google cloud platform': 'google cloud',
-        'azure': 'microsoft azure',
-        'microsoft azure': 'microsoft azure',
-        'ts': 'typescript',
-        'typescript': 'typescript',
-        'rest': 'rest api',
-        'rest api': 'rest api',
-        'restful': 'rest api',
-        'css3': 'css',
-        'html5': 'html',
-        'sql': 'sql',
-        'mysql': 'sql',
-        'nosql': 'nosql',
-        'ci/cd': 'ci/cd',
-        'cicd': 'ci/cd',
-    }
-    
-    # Skill families - skills in the same family are related
-    SKILL_FAMILIES = {
-        'javascript_ecosystem': {'javascript', 'nodejs', 'react', 'vue', 'angular', 'typescript', 'nextjs', 'express'},
-        'python_ecosystem': {'python', 'django', 'flask', 'fastapi', 'pandas', 'numpy'},
-        'databases': {'postgresql', 'mysql', 'sql', 'mongodb', 'redis', 'nosql'},
-        'cloud': {'aws', 'amazon web services', 'gcp', 'google cloud', 'azure', 'microsoft azure'},
-        'devops': {'docker', 'kubernetes', 'ci/cd', 'jenkins', 'terraform', 'ansible'},
-        'frontend': {'react', 'vue', 'angular', 'html', 'css', 'javascript', 'typescript'},
-        'backend': {'nodejs', 'python', 'java', 'golang', 'ruby', 'php'},
-        'ml_ai': {'machine learning', 'deep learning', 'tensorflow', 'pytorch', 'artificial intelligence'},
-        'mobile': {'react native', 'flutter', 'swift', 'kotlin', 'ios', 'android'},
-        'testing': {'jest', 'pytest', 'selenium', 'cypress', 'unit testing', 'integration testing'},
-    }
-    
-    # Soft skills that can be inferred
-    SOFT_SKILLS = {
-        'communication', 'teamwork', 'leadership', 'problem-solving', 
-        'problem solving', 'collaboration', 'agile', 'scrum', 
-        'stakeholder management', 'mentoring', 'ownership', 'adaptability'
-    }
-    
-    @classmethod
-    def normalize_skill(cls, skill: str) -> str:
-        """Normalize a single skill"""
-        skill_lower = skill.lower().strip()
-        return cls.SKILL_ALIASES.get(skill_lower, skill_lower)
-    
-    @classmethod
-    def normalize_skills(cls, skills: List[str]) -> List[str]:
-        """Normalize a list of skills"""
-        return [cls.normalize_skill(s) for s in skills]
-    
-    @classmethod
-    def is_soft_skill(cls, skill: str) -> bool:
-        """Check if a skill is a soft skill"""
-        normalized = cls.normalize_skill(skill)
-        return normalized in cls.SOFT_SKILLS
-    
-    @classmethod
-    def get_skill_family(cls, skill: str) -> Optional[str]:
-        """Get the family a skill belongs to"""
-        normalized = cls.normalize_skill(skill)
-        for family, skills in cls.SKILL_FAMILIES.items():
-            if normalized in skills:
-                return family
-        return None
-    
-    @classmethod
-    def are_related(cls, skill1: str, skill2: str) -> bool:
-        """Check if two skills are related (same family)"""
-        if skill1 == skill2:
-            return True
-        family1 = cls.get_skill_family(skill1)
-        family2 = cls.get_skill_family(skill2)
-        return family1 is not None and family1 == family2
-    
-    @classmethod
-    def find_exact_matches(cls, candidate_skills: List[str], required_skills: List[str]) -> Set[str]:
-        """Find exact matches between candidate and required skills"""
-        candidate_normalized = set(cls.normalize_skills(candidate_skills))
-        required_normalized = set(cls.normalize_skills(required_skills))
-        return candidate_normalized.intersection(required_normalized)
-    
-    @classmethod
-    def find_related_matches(cls, candidate_skills: List[str], required_skills: List[str]) -> Set[str]:
-        """Find related skills (same family but not exact match)"""
-        candidate_normalized = cls.normalize_skills(candidate_skills)
-        required_normalized = cls.normalize_skills(required_skills)
-        
-        related = set()
-        for req_skill in required_normalized:
-            if cls.is_soft_skill(req_skill):
-                continue
-            for cand_skill in candidate_normalized:
-                if req_skill != cand_skill and cls.are_related(req_skill, cand_skill):
-                    related.add(req_skill)
-                    break
-        return related
-    
-    @classmethod
-    def calculate_base_score(cls, candidate_skills: List[str], required_skills: List[str]) -> tuple:
-        """
-        Calculate base match score using rule-based logic
-        Returns: (score, exact_matches, possible_matches, missing_skills)
-        """
-        if not required_skills:
-            return 50, set(), set(), set()
-        
-        required_normalized = cls.normalize_skills(required_skills)
-        
-        # Separate hard and soft skills
-        hard_skills = [s for s in required_normalized if not cls.is_soft_skill(s)]
-        soft_skills = [s for s in required_normalized if cls.is_soft_skill(s)]
-        
-        # Find matches
-        exact_matches = cls.find_exact_matches(candidate_skills, required_skills)
-        related_matches = cls.find_related_matches(candidate_skills, required_skills)
-        
-        # Calculate missing skills
-        all_required = set(required_normalized)
-        all_matches = exact_matches.union(related_matches)
-        missing_skills = all_required - all_matches
-        
-        # Scoring logic
-        if not hard_skills:
-            # Only soft skills required (rare case)
-            score = (len(exact_matches) / len(required_skills)) * 100 if required_skills else 50
-        else:
-            # Primary score based on hard skills
-            hard_exact = len([s for s in exact_matches if not cls.is_soft_skill(s)])
-            hard_related = len([s for s in related_matches if not cls.is_soft_skill(s)])
-            hard_total = len(hard_skills)
-            
-            # Hard skill score (0-85)
-            hard_score = ((hard_exact * 1.0 + hard_related * 0.6) / hard_total) * 85
-            
-            # Soft skill bonus (0-15)
-            soft_bonus = 0
-            if soft_skills:
-                soft_matches = len([s for s in exact_matches if cls.is_soft_skill(s)])
-                soft_bonus = (soft_matches / len(soft_skills)) * 15
-            else:
-                # Infer soft skills from candidate profile
-                candidate_normalized = set(cls.normalize_skills(candidate_skills))
-                if any(s in candidate_normalized for s in ['agile', 'scrum', 'leadership', 'mentoring']):
-                    soft_bonus = 10
-            
-            score = hard_score + soft_bonus
-        
-        return int(min(100, max(0, score))), exact_matches, related_matches, missing_skills
-
-# ============================================================================
 # LLM ENHANCEMENT SERVICE
 # ============================================================================
 
@@ -277,7 +118,10 @@ class LLMEnhancer:
         4. Final ranking
         """
         
-        if not OPENROUTER_API_KEY:
+        # Only return as many recommendations as we have jobs
+        top_n = min(top_n, len(matches))
+        
+        if not config.is_llm_configured():
             # Fallback to rule-based only
             return LLMEnhancer._fallback_recommendations(matches, top_n)
         
@@ -321,65 +165,49 @@ Return valid JSON with this structure:
   ]
 }
 
-Return exactly 5 recommendations, ordered by match_score (highest first)."""
+IMPORTANT: Only return recommendations for the jobs provided above. Do not create or suggest jobs that were not in the input. Order by match_score (highest first)."""
 
             candidate_skills_str = ", ".join(matches[0].candidate_skills) if matches else ""
             
-            response = requests.post(
-                OPENROUTER_URL,
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "http://localhost:3000",
-                    "X-Title": "HireFlow AI"
-                },
-                json={
-                    "model": "anthropic/claude-3.5-sonnet",  # More capable model
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {
-                            "role": "user", 
-                            "content": f"Candidate Skills: {candidate_skills_str}\n\nJobs with base scores:\n{json.dumps(jobs_data, indent=2)}\n\nAnalyze and return top 5 recommendations with adjusted scores and explanations."
-                        }
-                    ],
-                    "temperature": 0.3,
-                    "max_tokens": 2000
-                },
-                timeout=30
+            response_json = call_llm_api(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user", 
+                        "content": f"Candidate Skills: {candidate_skills_str}\n\nJobs with base scores:\n{json.dumps(jobs_data, indent=2)}\n\nAnalyze and return recommendations for these {len(jobs_data)} job(s) with adjusted scores and explanations. Only include jobs from the list above."
+                    }
+                ],
+                temperature=0.3,
+                max_tokens=2000
             )
             
-            response_json = response.json()
-            
-            if "choices" not in response_json or not response_json["choices"]:
-                print(f"Invalid LLM response: {response_json}")
+            content = extract_llm_content(response_json)
+            if not content:
+                print(f"Invalid LLM response")
                 return LLMEnhancer._fallback_recommendations(matches, top_n)
             
-            content = response_json["choices"][0]["message"]["content"]
-            
-            # Try to parse JSON (handle markdown code blocks)
-            content = content.strip()
-            if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-                content = content.strip()
-            
-            result = json.loads(content)
+            result = parse_json_response(content)
             recommendations = result.get("recommendations", [])
             
             # Validate and convert to Recommendation objects
+            # Filter out any hallucinated jobs not in original matches
+            valid_job_ids = {match.job_id for match in matches}
             validated_recs = []
             for rec in recommendations[:top_n]:
                 try:
-                    validated_recs.append(Recommendation(**rec))
+                    # Only include if job_id matches one of the input jobs
+                    if rec.get('job_id') in valid_job_ids:
+                        validated_recs.append(Recommendation(**rec))
+                    else:
+                        print(f"Skipping hallucinated job: {rec.get('job_title', 'unknown')}")
                 except Exception as e:
                     print(f"Invalid recommendation format: {e}")
                     continue
             
-            if len(validated_recs) >= top_n:
+            if validated_recs:
                 return validated_recs
             else:
-                # Not enough valid recommendations, use fallback
+                # No valid recommendations, use fallback
                 return LLMEnhancer._fallback_recommendations(matches, top_n)
                 
         except Exception as e:
@@ -481,15 +309,15 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "llm_configured": bool(OPENROUTER_API_KEY),
-        "proctoring_enabled": PROCTORING_ENABLED
+        "llm_configured": config.is_llm_configured(),
+        "proctoring_enabled": config.PROCTORING_ENABLED
     }
 
 # ============================================================================
 # PROCTORING ENDPOINTS
 # ============================================================================
 
-if PROCTORING_ENABLED:
+if config.PROCTORING_ENABLED:
     @app.post("/ai/proctoring/process-frame", response_model=FrameProcessResponse)
     async def process_frame_endpoint(request: FrameProcessRequest):
         """
@@ -535,4 +363,4 @@ if PROCTORING_ENABLED:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host=config.HOST, port=config.PORT)

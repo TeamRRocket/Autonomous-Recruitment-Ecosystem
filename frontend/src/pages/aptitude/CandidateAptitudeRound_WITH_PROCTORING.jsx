@@ -172,16 +172,7 @@ const CandidateAptitudeRound = () => {
     useEffect(() => {
         if (!examStarted) return;
 
-        try {
-            if (document?.fullscreenElement == null && document?.documentElement?.requestFullscreen) {
-                const p = document.documentElement.requestFullscreen();
-                if (p && typeof p.catch === 'function') {
-                    p.catch(() => { });
-                }
-            }
-        } catch {
-            // ignore
-        }
+        // Fullscreen removed - can only be triggered by user gesture, not automatically
     }, [examStarted]);
 
     // Block back navigation

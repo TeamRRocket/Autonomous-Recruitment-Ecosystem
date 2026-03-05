@@ -147,24 +147,24 @@ const CreateEditJob = () => {
         }
     };
 
-    if (loading) return <div className="text-center p-8 text-white">Loading...</div>;
+    if (loading) return <div className="text-center p-8 text-muted-foreground">Loading...</div>;
 
     return (
-        <div className="min-h-screen bg-slate-900 py-12 px-4 sm:px-6 lg:px-8 flex justify-center">
+        <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 flex justify-center animate-fade-in">
             <div className="max-w-3xl w-full">
                 <div className="mb-8">
-                    <button onClick={() => navigate('/dashboard')} className="text-slate-400 hover:text-white mb-4 flex items-center gap-1 transition-colors">
+                    <button onClick={() => navigate('/dashboard')} className="text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1 transition-colors">
                         &larr; Back to Dashboard
                     </button>
-                    <h2 className="text-3xl font-bold text-white">
+                    <h2 className="text-3xl font-bold gradient-text font-heading">
                         {isEditMode ? 'Edit Job Posting' : 'Post a New Job'}
                     </h2>
-                    <p className="mt-2 text-slate-400">
+                    <p className="mt-2 text-muted-foreground">
                         Reach thousands of qualified candidates.
                     </p>
                 </div>
 
-                <div className="bg-slate-800/50 border border-slate-700 rounded-xl shadow-xl overflow-hidden p-8">
+                <div className="glass-card p-8">
                     <form className="space-y-6" onSubmit={handleSubmit}>
 
                         <div className="grid grid-cols-1 gap-6">
@@ -206,13 +206,13 @@ const CreateEditJob = () => {
 
                             {/* Requirements Tag Input */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-1">
-                                    Requirements <span className="text-red-400">*</span>
+                                <label className="block text-sm font-medium text-foreground mb-1">
+                                    Requirements <span className="text-destructive">*</span>
                                 </label>
                                 <div className="flex gap-2 mb-2">
                                     <input
                                         type="text"
-                                        className="input-field flex-1 bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:ring-indigo-500 focus:border-indigo-500 block sm:text-sm rounded-lg p-2.5"
+                                        className="input-field flex-1 bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring focus:border-ring block sm:text-sm rounded-lg p-2.5"
                                         placeholder="Add a requirement (e.g. React, 3+ years experience)"
                                         value={currentReq}
                                         onChange={(e) => setCurrentReq(e.target.value)}
@@ -221,26 +221,26 @@ const CreateEditJob = () => {
                                     <button
                                         type="button"
                                         onClick={addRequirement}
-                                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center"
+                                        className="px-4 py-2 bg-accent hover:bg-accent/80 text-foreground rounded-lg transition-colors flex items-center border border-border"
                                     >
                                         <Plus size={18} />
                                     </button>
                                 </div>
                                 <div className="flex flex-wrap gap-2 mt-3">
                                     {formData.requirements.map((req, idx) => (
-                                        <div key={idx} className="flex items-center bg-blue-500/10 border border-blue-500/30 text-blue-300 px-3 py-1.5 rounded-lg text-sm">
+                                        <div key={idx} className="flex items-center bg-primary/10 border border-primary/30 text-primary px-3 py-1.5 rounded-lg text-sm">
                                             <span>{req}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => removeRequirement(req)}
-                                                className="ml-2 text-blue-400 hover:text-white"
+                                                className="ml-2 text-primary hover:text-foreground"
                                             >
                                                 <X size={14} />
                                             </button>
                                         </div>
                                     ))}
                                     {formData.requirements.length === 0 && (
-                                        <span className="text-sm text-slate-500 italic">No requirements added yet.</span>
+                                        <span className="text-sm text-muted-foreground italic">No requirements added yet.</span>
                                     )}
                                 </div>
                             </div>
@@ -255,10 +255,10 @@ const CreateEditJob = () => {
                                 onChange={handleChange}
                             />
 
-                            <div className="border-t border-slate-700/60 pt-6">
+                            <div className="border-t border-border pt-6">
                                 <div className="mb-6">
-                                    <p className="text-white font-semibold">Assessment Pipeline</p>
-                                    <p className="text-xs text-slate-500">Choose which assessment the candidate must take first (no gap).</p>
+                                    <p className="text-foreground font-semibold font-heading">Assessment Pipeline</p>
+                                    <p className="text-xs text-muted-foreground">Choose which assessment the candidate must take first (no gap).</p>
                                     <div className="mt-3 max-w-xs">
                                         <InputGroup
                                             label="First Round"
@@ -272,16 +272,16 @@ const CreateEditJob = () => {
 
                                 <div className="flex items-center justify-between gap-4">
                                     <div>
-                                        <p className="text-white font-semibold">Aptitude Round (MCQ)</p>
-                                        <p className="text-xs text-slate-500">Enable and configure aptitude assessment for candidates.</p>
+                                        <p className="text-foreground font-semibold font-heading">Aptitude Round (MCQ)</p>
+                                        <p className="text-xs text-muted-foreground">Enable and configure aptitude assessment for candidates.</p>
                                     </div>
-                                    <label className="flex items-center gap-2 text-slate-300">
+                                    <label className="flex items-center gap-2 text-foreground">
                                         <input
                                             type="checkbox"
                                             name="aptitude_enabled"
                                             checked={!!formData.aptitude_enabled}
                                             onChange={handleChange}
-                                            className="h-4 w-4 rounded border-slate-600 bg-slate-900"
+                                            className="h-4 w-4 rounded border-border bg-input"
                                         />
                                         Enabled
                                     </label>
@@ -319,13 +319,13 @@ const CreateEditJob = () => {
                             <button
                                 type="button"
                                 onClick={() => navigate('/dashboard')}
-                                className="w-full sm:w-auto px-6 py-3 border border-slate-600 text-slate-300 font-medium rounded-lg hover:bg-slate-700 focus:outline-none transition-colors"
+                                className="w-full sm:w-auto px-6 py-3 border border-border text-foreground font-medium rounded-lg hover:bg-accent focus:outline-none transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                className="w-full sm:w-auto px-6 py-3 border border-transparent text-sm font-semibold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-lg"
+                                className="w-full sm:w-auto px-6 py-3 border border-transparent text-sm font-semibold rounded-lg text-white gradient-primary hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring shadow-lg transition-opacity"
                             >
                                 {isEditMode ? 'Update Job' : 'Create Job'}
                             </button>

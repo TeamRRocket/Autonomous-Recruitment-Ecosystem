@@ -1,20 +1,9 @@
 import json
 from typing import Dict, List
-import requests
 
-
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "anthropic/claude-3.5-sonnet"
-
-
-def _parse_json_response(content: str) -> Dict:
-    text = content.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
-    return json.loads(text)
+from ..config import config
+from ..utils import parse_json_response, call_llm_api
+from ..utils.llm_client import extract_llm_content
 
 
 def score_with_llm(resume: Dict, job_description: str, job_required_skills: List[str], api_key: str) -> Dict:
@@ -46,31 +35,18 @@ def score_with_llm(resume: Dict, job_description: str, job_required_skills: List
     )
 
     try:
-        response = requests.post(
-            OPENROUTER_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:3000",
-                "X-Title": "HireFlow AI",
-            },
-            json={
-                "model": MODEL_NAME,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": 0,
-                "max_tokens": 1500,
-            },
-            timeout=30,
+        response_json = call_llm_api(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0,
+            max_tokens=1500
         )
-        response.raise_for_status()
-        payload = response.json()
-        if "choices" not in payload or not payload["choices"]:
+        content = extract_llm_content(response_json)
+        if not content:
             raise ValueError("No choices")
-        content = payload["choices"][0]["message"]["content"]
-        parsed = _parse_json_response(content)
+        parsed = parse_json_response(content)
         return {
             "project_score": float(parsed.get("project_score", 0)),
             "soft_skill_score": float(parsed.get("soft_skill_score", 0)),

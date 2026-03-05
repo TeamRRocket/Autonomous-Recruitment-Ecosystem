@@ -34,8 +34,8 @@ const Step3ConfigureRounds = ({ selectedRounds, setSelectedRounds, onNext, onBac
         <div className="space-y-8">
             <div className="flex items-center justify-between mb-2">
                 <div>
-                    <h3 className="text-xl font-bold text-white">Configure Interview Experience</h3>
-                    <p className="text-slate-500 text-sm mt-1">Set parameters for each selected round to ensure a fair assessment flow.</p>
+                    <h3 className="text-xl font-bold text-foreground font-heading">Configure Interview Experience</h3>
+                    <p className="text-muted-foreground text-sm mt-1">Set parameters for each selected round to ensure a fair assessment flow.</p>
                 </div>
             </div>
 
@@ -50,19 +50,20 @@ const Step3ConfigureRounds = ({ selectedRounds, setSelectedRounds, onNext, onBac
                 ))}
             </div>
 
-            <div className="pt-8 flex justify-between border-t border-slate-800">
+            <div className="pt-8 flex justify-between border-t border-border">
                 <button
                     onClick={onBack}
-                    className="px-8 py-3 rounded-lg font-semibold border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-all capitalize"
+                    className="px-8 py-3 rounded-lg font-semibold border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-all capitalize"
                 >
                     Back to Selection
                 </button>
                 <button
                     onClick={handleContinue}
                     disabled={!isAllConfigured()}
-                    className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 capitalize ${isAllConfigured()
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20'
-                        : 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'
+                    className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 capitalize ${
+                        isAllConfigured()
+                        ? 'gradient-primary text-white shadow-lg hover:opacity-90'
+                        : 'bg-accent text-muted-foreground cursor-not-allowed border border-border'
                         }`}
                 >
                     Review & Publish

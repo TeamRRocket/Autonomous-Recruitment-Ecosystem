@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log.*
+logs/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Testing
+.coverage
+.pytest_cache/
+coverage/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# ML models (large files)
+*.pt
+*.pth
+*.h5
+*.pkl
+!yolov8n.pt
+
+# Uploads (user-generated content)
+backend/uploads/resumes/*.pdf
+backend/uploads/resumes/*.docx
+backend/uploads/resumes/*.doc
+!backend/uploads/resumes/.gitkeep

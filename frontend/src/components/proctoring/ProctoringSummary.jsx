@@ -21,8 +21,8 @@ const ProctoringSummary = ({
     // If no proctoring data, don't render
     if (riskScore === null || riskScore === undefined) {
         return (
-            <div className="bg-slate-100 border border-slate-300 rounded-lg p-4">
-                <p className="text-sm text-slate-600">
+            <div className="glass-card p-4">
+                <p className="text-sm text-muted-foreground">
                     No proctoring data available for this candidate.
                 </p>
             </div>
@@ -34,34 +34,34 @@ const ProctoringSummary = ({
         switch (riskLevel) {
             case 'Low':
                 return {
-                    bg: 'bg-green-50',
-                    border: 'border-green-200',
-                    text: 'text-green-700',
-                    badge: 'bg-green-100 text-green-800',
+                    bg: 'bg-success/5',
+                    border: 'border-success/20',
+                    text: 'text-success',
+                    badge: 'bg-success/10 text-success border border-success/30',
                     icon: '✓'
                 };
             case 'Medium':
                 return {
-                    bg: 'bg-yellow-50',
-                    border: 'border-yellow-200',
-                    text: 'text-yellow-700',
-                    badge: 'bg-yellow-100 text-yellow-800',
+                    bg: 'bg-warning/5',
+                    border: 'border-warning/20',
+                    text: 'text-warning',
+                    badge: 'bg-warning/10 text-warning border border-warning/30',
                     icon: '⚠'
                 };
             case 'High':
                 return {
-                    bg: 'bg-red-50',
-                    border: 'border-red-200',
-                    text: 'text-red-700',
-                    badge: 'bg-red-100 text-red-800',
+                    bg: 'bg-destructive/5',
+                    border: 'border-destructive/20',
+                    text: 'text-destructive',
+                    badge: 'bg-destructive/10 text-destructive border border-destructive/30',
                     icon: '⚠'
                 };
             default:
                 return {
-                    bg: 'bg-slate-50',
-                    border: 'border-slate-200',
-                    text: 'text-slate-700',
-                    badge: 'bg-slate-100 text-slate-800',
+                    bg: 'bg-muted/30',
+                    border: 'border-border',
+                    text: 'text-muted-foreground',
+                    badge: 'bg-muted text-muted-foreground border border-border',
                     icon: 'ℹ'
                 };
         }
@@ -98,8 +98,8 @@ const ProctoringSummary = ({
                         {colors.icon}
                     </div>
                     <div>
-                        <h3 className="text-lg font-semibold text-slate-900">Proctoring Assessment</h3>
-                        <p className="text-sm text-slate-600">AI-based exam integrity analysis</p>
+                        <h3 className="text-lg font-semibold text-foreground font-heading">Proctoring Assessment</h3>
+                        <p className="text-sm text-muted-foreground">AI-based exam integrity analysis</p>
                     </div>
                 </div>
                 <div className="text-right">
@@ -114,20 +114,20 @@ const ProctoringSummary = ({
 
             {/* Risk Score Bar */}
             <div className="mb-4">
-                <div className="flex justify-between text-xs text-slate-600 mb-1">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
                     <span>Risk Score</span>
                     <span>{riskScore}%</span>
                 </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
+                <div className="w-full bg-accent rounded-full h-2">
                     <div
-                        className={`h-2 rounded-full transition-all ${riskLevel === 'Low' ? 'bg-green-500' :
-                                riskLevel === 'Medium' ? 'bg-yellow-500' :
-                                    'bg-red-500'
+                        className={`h-2 rounded-full transition-all ${riskLevel === 'Low' ? 'bg-success' :
+                                riskLevel === 'Medium' ? 'bg-warning' :
+                                    'bg-destructive'
                             }`}
                         style={{ width: `${riskScore}%` }}
                     ></div>
                 </div>
-                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
                     <span>Low (0-39)</span>
                     <span>Medium (40-69)</span>
                     <span>High (70-100)</span>
@@ -135,26 +135,26 @@ const ProctoringSummary = ({
             </div>
 
             {/* Reason/Explanation */}
-            <div className="bg-white rounded-lg p-4 border border-slate-200">
+            <div className="glass-card p-4">
                 <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-semibold text-slate-700">Assessment Details</h4>
+                    <h4 className="text-sm font-semibold text-foreground">Assessment Details</h4>
                     {reason && reason.length > 150 && (
                         <button
                             onClick={() => setExpanded(!expanded)}
-                            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                            className="text-xs text-primary hover:text-primary/80 font-medium"
                         >
                             {expanded ? 'Show Less' : 'Show More'}
                         </button>
                     )}
                 </div>
-                <p className={`text-sm text-slate-600 ${!expanded && reason && reason.length > 150 ? 'line-clamp-3' : ''}`}>
+                <p className={`text-sm text-muted-foreground ${!expanded && reason && reason.length > 150 ? 'line-clamp-3' : ''}`}>
                     {reason || 'No detailed assessment available.'}
                 </p>
             </div>
 
             {/* Info Footer */}
-            <div className="mt-4 pt-4 border-t border-slate-200">
-                <p className="text-xs text-slate-500">
+            <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground">
                     <strong>Note:</strong> This assessment is based on AI analysis of behavioral patterns during the exam.
                     It should be used as one factor among many in your evaluation process.
                 </p>

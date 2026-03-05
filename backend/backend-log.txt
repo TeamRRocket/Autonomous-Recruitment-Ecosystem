@@ -1,2 +1,9 @@
+
+> backend@1.0.0 start
+> node src/index.js
+
+✓ Redis configured at: redis://127.0.0.1:6379
+✓ Proctoring WebSocket server initialized on /proctoring/ws
 Server running on port 3000
-Database connected successfully at: 2026-01-23T09:08:18.028Z
+WebSocket available at ws://localhost:3000/proctoring/ws
+Database connected successfully at: 2026-03-05T16:47:29.556Z

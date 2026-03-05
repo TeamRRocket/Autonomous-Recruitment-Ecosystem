@@ -57,11 +57,11 @@ const RecruiterApplications = () => {
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'PENDING': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-            case 'REVIEWING': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-            case 'SHORTLISTED': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-            case 'REJECTED': return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
-            default: return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+            case 'PENDING': return 'status-pending';
+            case 'REVIEWING': return 'bg-primary/10 text-primary border-primary/20';
+            case 'SHORTLISTED': return 'status-shortlisted';
+            case 'REJECTED': return 'status-rejected';
+            default: return 'bg-muted/10 text-muted-foreground border-border';
         }
     };
 
@@ -77,36 +77,36 @@ const RecruiterApplications = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white mb-2">Manage Applications</h1>
-                    <p className="text-slate-400">Track and review candidate submissions across all your job openings.</p>
+                    <h1 className="text-2xl font-bold font-heading gradient-text mb-2">Manage Applications</h1>
+                    <p className="text-muted-foreground">Track and review candidate submissions across all your job openings.</p>
                 </div>
             </div>
 
             {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 glass-card p-4">
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                     <input
                         type="text"
                         placeholder="Search candidate or job..."
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 pl-10 pr-4 text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all text-sm"
+                        className="w-full bg-input border border-border rounded-lg py-2 pl-10 pr-4 text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all text-sm"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Filter size={18} className="text-slate-500" />
+                    <Filter size={18} className="text-muted-foreground" />
                     <select
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all text-sm"
+                        className="flex-1 bg-input border border-border rounded-lg py-2 px-3 text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all text-sm"
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
                     >
@@ -119,9 +119,9 @@ const RecruiterApplications = () => {
                 </div>
 
                 <div className="flex items-center space-x-2">
-                    <Briefcase size={18} className="text-slate-500" />
+                    <Briefcase size={18} className="text-muted-foreground" />
                     <select
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all text-sm"
+                        className="flex-1 bg-input border border-border rounded-lg py-2 px-3 text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all text-sm"
                         value={filterJob}
                         onChange={(e) => setFilterJob(e.target.value)}
                     >
@@ -134,19 +134,19 @@ const RecruiterApplications = () => {
             </div>
 
             {/* Applications Table */}
-            <div className="bg-slate-900/50 rounded-xl border border-slate-800 overflow-hidden">
+            <div className="glass-card overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="border-b border-slate-800 bg-slate-800/30">
-                                <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Candidate</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Job / Role</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Applied Date</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                            <tr className="border-b border-border bg-accent">
+                                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Candidate</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Job / Role</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Applied Date</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/50">
+                        <tbody className="divide-y divide-border">
                             {filteredApplications.length > 0 ? (
                                 filteredApplications.map((app) => (
                                     <tr key={app.id} className="hover:bg-slate-800/30 transition-colors group">
@@ -184,7 +184,7 @@ const RecruiterApplications = () => {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
-                                                    className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 transition-colors"
+                                                    className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors"
                                                     title="View Resume"
                                                     onClick={() => window.open(`http://localhost:3000/uploads/resumes/${app.resume_file_path}`, '_blank')}
                                                 >

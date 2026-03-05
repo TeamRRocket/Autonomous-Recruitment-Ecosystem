@@ -6,7 +6,7 @@ import { pool } from '../config/db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const defaultDatasetPath = path.resolve(__dirname, '../../../datasets/leetcode_dataset - lc.csv');
+const defaultDatasetPath = path.resolve(__dirname, '../../../datasets/leetcode_dataset.csv');
 
 const getArgValue = (key) => {
   const idx = process.argv.findIndex((a) => a === key);

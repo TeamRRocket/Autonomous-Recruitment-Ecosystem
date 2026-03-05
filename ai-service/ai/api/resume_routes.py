@@ -1,20 +1,18 @@
 import base64
-import json
-from typing import Any, Dict
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-import requests
 
+from ..config import config
+from ..utils import parse_json_response, call_llm_api
+from ..utils.llm_client import extract_llm_content
 from ..resume_ingestion.extractor import extract_text
 from ..resume_normalization.schema import empty_resume_schema
 from ..scoring.rule_scores import score_skills, score_experience, score_education
-import os
 
 
 router = APIRouter()
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 
 class ScoreRequest(BaseModel):
@@ -25,85 +23,58 @@ class ScoreRequest(BaseModel):
     resume_filename: Optional[str] = None
 
 
-def _parse_json_response(content: str) -> Dict[str, Any]:
-    text = (content or "").strip()
-    if text.startswith("```"):
-        parts = text.split("```")
-        if len(parts) >= 2:
-            text = parts[1]
-        if text.startswith("json"):
-            text = text[4:]
-        text = text.strip()
-    return json.loads(text)
-
-
 def _build_resume_score_prompt(job_description: str, resume_text: str) -> str:
     return (
         "You are an AI Resume Processing Engine inside an Autonomous Recruitment Ecosystem.\n\n"
         "Your role is STRICTLY LIMITED to:\n"
-        "1. Parsing resume content.\n"
-        "2. Comparing it with the provided Job Description.\n"
-        "3. Generating structured JSON output.\n"
-        "4. Computing resume-based scoring.\n\n"
-        "You are NOT allowed to:\n"
-        "- Make hiring decisions.\n"
-        "- Shortlist or reject candidates.\n"
-        "- Add explanations outside JSON.\n"
-        "- Output anything other than valid JSON.\n\n"
-        "INPUTS:\n"
-        f"1) Job Description: {job_description}\n"
-        f"2) Resume Text: {resume_text}\n\n"
-        "TASKS:\n\n"
-        "STEP 1: Extract:\n"
-        "- full_name\n"
-        "- email\n"
-        "- phone\n"
-        "- total_years_experience\n"
-        "- education[]\n"
-        "- skills[]\n"
-        "- technical_skills[]\n"
-        "- soft_skills[]\n"
-        "- projects[]\n"
-        "- certifications[]\n"
-        "- previous_companies[]\n"
-        "- current_role\n\n"
-        "STEP 2: Compute scores:\n\n"
-        "skill_match_score (0–100)\n"
-        "experience_relevance_score (0–100)\n"
-        "education_relevance_score (0–100)\n\n"
-        "Weights:\n"
-        "Skill = 50%\n"
-        "Experience = 30%\n"
-        "Education = 20%\n\n"
-        "overall_resume_score =\n"
-        "(skill_match_score * 0.5) +\n"
-        "(experience_relevance_score * 0.3) +\n"
-        "(education_relevance_score * 0.2)\n\n"
-        "Round to nearest integer.\n\n"
-        "STEP 3: Generate 3–5 sentence professional summary.\n\n"
-        "STRICT OUTPUT:\n"
-        "Valid JSON only. No markdown. No explanation.\n\n"
-        "Return exactly this JSON shape:\n"
+        "1. Extract information from the resume.\n"
+        "2. Score the candidate's fit for the job (0-100 scale).\n"
+        "3. Output ONLY valid JSON with NO markdown, NO explanations.\n\n"
+        "JOB DESCRIPTION:\n"
+        f"{job_description}\n\n"
+        "RESUME TEXT:\n"
+        f"{resume_text}\n\n"
+        "SCORING INSTRUCTIONS:\n\n"
+        "1. skill_match_score (0-100):\n"
+        "   - Compare candidate's skills to job requirements\n"
+        "   - 80-100: Has most/all required skills\n"
+        "   - 50-79: Has some required skills\n"
+        "   - 20-49: Has few matching skills\n"
+        "   - 0-19: No relevant skills\n\n"
+        "2. experience_relevance_score (0-100):\n"
+        "   - 80-100: Extensive relevant experience (3+ years)\n"
+        "   - 50-79: Moderate experience (1-3 years)\n"
+        "   - 20-49: Some experience (< 1 year)\n"
+        "   - 0-19: No relevant experience\n\n"
+        "3. education_relevance_score (0-100):\n"
+        "   - 80-100: Relevant degree/certification\n"
+        "   - 50-79: Related field\n"
+        "   - 20-49: Different field but relevant\n"
+        "   - 0-19: Not relevant\n\n"
+        "4. overall_resume_score:\n"
+        "   = (skill_match_score × 0.5) + (experience_relevance_score × 0.3) + (education_relevance_score × 0.2)\n"
+        "   IMPORTANT: Calculate this as an integer between 0-100.\n\n"
+        "OUTPUT FORMAT (JSON only, no markdown):\n"
         "{\n"
-        "  \"full_name\": \"\",\n"
-        "  \"email\": \"\",\n"
-        "  \"phone\": \"\",\n"
-        "  \"total_years_experience\": 0,\n"
-        "  \"education\": [],\n"
-        "  \"skills\": [],\n"
-        "  \"technical_skills\": [],\n"
-        "  \"soft_skills\": [],\n"
-        "  \"projects\": [],\n"
-        "  \"certifications\": [],\n"
-        "  \"previous_companies\": [],\n"
-        "  \"current_role\": \"\",\n"
+        "  \"full_name\": \"extracted name\",\n"
+        "  \"email\": \"extracted email\",\n"
+        "  \"phone\": \"extracted phone\",\n"
+        "  \"total_years_experience\": <number>,\n"
+        "  \"education\": [\"degree 1\", \"degree 2\"],\n"
+        "  \"skills\": [\"all skills\"],\n"
+        "  \"technical_skills\": [\"technical skills\"],\n"
+        "  \"soft_skills\": [\"soft skills\"],\n"
+        "  \"projects\": [\"project names or descriptions\"],\n"
+        "  \"certifications\": [\"certs\"],\n"
+        "  \"previous_companies\": [\"companies\"],\n"
+        "  \"current_role\": \"current job title\",\n"
         "  \"matching_scores\": {\n"
-        "    \"skill_match_score\": 0,\n"
-        "    \"experience_relevance_score\": 0,\n"
-        "    \"education_relevance_score\": 0,\n"
-        "    \"overall_resume_score\": 0\n"
+        "    \"skill_match_score\": <calculate 0-100>,\n"
+        "    \"experience_relevance_score\": <calculate 0-100>,\n"
+        "    \"education_relevance_score\": <calculate 0-100>,\n"
+        "    \"overall_resume_score\": <calculate weighted average>\n"
         "  },\n"
-        "  \"professional_summary\": \"\"\n"
+        "  \"professional_summary\": \"2-3 sentence summary\"\n"
         "}\n"
     )
 
@@ -141,43 +112,56 @@ async def score_resume(request: ScoreRequest):
             "professional_summary": "",
         }
 
-    if OPENROUTER_API_KEY:
+    if config.is_llm_configured():
         prompt = _build_resume_score_prompt(request.job_description, raw_text)
         try:
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "http://localhost:3000",
-                    "X-Title": "HireFlow AI",
-                },
-                json={
-                    "model": "anthropic/claude-3.5-sonnet",
-                    "messages": [
-                        {"role": "system", "content": prompt},
-                        {"role": "user", "content": "Return the JSON now."},
-                    ],
-                    "temperature": 0,
-                    "max_tokens": 750,
-                },
-                timeout=45,
+            response_json = call_llm_api(
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": "Analyze the resume and return the scored JSON response. Calculate actual scores based on the job fit."},
+                ],
+                temperature=0.3,
+                max_tokens=1500,
+                timeout=60
             )
-            response.raise_for_status()
-            payload = response.json()
-            if "choices" not in payload or not payload["choices"]:
+            content = extract_llm_content(response_json)
+            if not content:
                 raise ValueError("Empty LLM response")
-            content = payload["choices"][0]["message"]["content"]
-            parsed = _parse_json_response(content)
+            parsed = parse_json_response(content)
+            
+            # Check if LLM returned all zeros - if so, recalculate with rule-based scoring
+            scores = parsed.get("matching_scores", {})
+            if (scores.get("skill_match_score", 0) == 0 and 
+                scores.get("experience_relevance_score", 0) == 0 and 
+                scores.get("education_relevance_score", 0) == 0):
+                # LLM didn't score properly, calculate scores ourselves
+                skill_score, _ = score_skills(parsed, request.required_skills or [])
+                experience_score = score_experience(parsed, job_title=request.job_description[:100] if request.job_description else "")
+                education_score = score_education(parsed, required_degree=None)
+                overall = int(round(
+                    (skill_score * config.SKILL_WEIGHT) + 
+                    (experience_score * config.EXPERIENCE_WEIGHT) + 
+                    (education_score * config.EDUCATION_WEIGHT)
+                ))
+                parsed["matching_scores"] = {
+                    "skill_match_score": int(round(skill_score)),
+                    "experience_relevance_score": int(round(experience_score)),
+                    "education_relevance_score": int(round(education_score)),
+                    "overall_resume_score": overall,
+                }
+            
             return parsed
         except Exception:
             pass
-
     resume_json = empty_resume_schema(raw_text=raw_text)
     skill_score, _ = score_skills(resume_json, request.required_skills or [])
     experience_score = score_experience(resume_json, job_title="")
     education_score = score_education(resume_json, required_degree=None)
-    overall = int(round((skill_score * 0.5) + (experience_score * 0.3) + (education_score * 0.2)))
+    overall = int(round(
+        (skill_score * config.SKILL_WEIGHT) + 
+        (experience_score * config.EXPERIENCE_WEIGHT) + 
+        (education_score * config.EDUCATION_WEIGHT)
+    ))
 
     return {
         "full_name": resume_json.get("personal", {}).get("name", "") if isinstance(resume_json.get("personal"), dict) else "",

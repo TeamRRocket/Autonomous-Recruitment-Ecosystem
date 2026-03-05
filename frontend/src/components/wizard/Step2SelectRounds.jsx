@@ -52,9 +52,9 @@ const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }
 
     return (
         <div className="space-y-8">
-            <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <CheckCircle2 className="text-blue-500" size={20} />
+            <div className="glass-card p-6">
+                <h3 className="text-lg font-semibold text-foreground font-heading mb-4 flex items-center gap-2">
+                    <CheckCircle2 className="text-primary" size={20} />
                     Available Rounds
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -64,16 +64,18 @@ const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }
                             <button
                                 key={round.id}
                                 onClick={() => toggleRound(round)}
-                                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 text-left ${isSelected
-                                    ? 'bg-blue-600/10 border-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.1)]'
-                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+                                    isSelected
+                                    ? 'bg-primary/10 border-primary shadow-lg'
+                                    : 'bg-accent border-border hover:border-primary/50'
                                     }`}
                             >
                                 <div className="flex flex-col">
-                                    <span className="font-bold text-sm uppercase tracking-wide opacity-50 mb-1">{round.type}</span>
-                                    <span className="font-semibold">{round.name}</span>
+                                    <span className={`font-bold text-sm uppercase tracking-wide mb-1 ${isSelected ? 'text-primary/70' : 'text-muted-foreground/70'}`}>{round.type}</span>
+                                    <span className={`font-semibold ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>{round.name}</span>
                                 </div>
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-600'
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                    isSelected ? 'bg-primary border-primary text-white' : 'border-border'
                                     }`}>
                                     {isSelected && <CheckCircle2 size={16} />}
                                 </div>
@@ -84,26 +86,27 @@ const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }
             </div>
 
             {selectedRounds.length > 0 && (
-                <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-white mb-4">Round Order Strategy</h3>
+                <div className="glass-card p-6">
+                    <h3 className="text-lg font-semibold text-foreground font-heading mb-4">Round Order Strategy</h3>
                     <div className="space-y-3">
                         {selectedRounds.map((round, index) => (
                             <div
                                 key={round.id}
-                                className="flex items-center gap-4 bg-slate-900/50 border border-slate-700 p-4 rounded-xl group hover:border-blue-500/50 transition-colors"
+                                className="flex items-center gap-4 bg-accent border border-border p-4 rounded-xl group hover:border-primary/50 transition-colors"
                             >
-                                <div className="flex flex-col items-center justify-center w-8 text-slate-500 font-bold">
+                                <div className="flex flex-col items-center justify-center w-8 text-muted-foreground font-bold">
                                     {index + 1}
                                 </div>
                                 <div className="flex-1">
-                                    <p className="font-semibold text-white">{round.name}</p>
-                                    <p className="text-xs text-slate-500 uppercase tracking-widest">{round.type}</p>
+                                    <p className="font-semibold text-foreground">{round.name}</p>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-widest">{round.type}</p>
                                 </div>
                                 <div className="flex gap-1">
                                     <button
                                         onClick={() => moveRound(index, 'up')}
                                         disabled={index === 0}
-                                        className={`p-2 rounded-lg transition-colors ${index === 0 ? 'text-slate-700' : 'text-slate-400 hover:bg-slate-700 hover:text-white'
+                                        className={`p-2 rounded-lg transition-colors ${
+                                            index === 0 ? 'text-muted-foreground/30' : 'text-muted-foreground hover:bg-accent/80 hover:text-foreground'
                                             }`}
                                     >
                                         <ChevronUp size={20} />
@@ -111,7 +114,8 @@ const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }
                                     <button
                                         onClick={() => moveRound(index, 'down')}
                                         disabled={index === selectedRounds.length - 1}
-                                        className={`p-2 rounded-lg transition-colors ${index === selectedRounds.length - 1 ? 'text-slate-700' : 'text-slate-400 hover:bg-slate-700 hover:text-white'
+                                        className={`p-2 rounded-lg transition-colors ${
+                                            index === selectedRounds.length - 1 ? 'text-muted-foreground/30' : 'text-muted-foreground hover:bg-accent/80 hover:text-foreground'
                                             }`}
                                     >
                                         <ChevronDown size={20} />
@@ -126,16 +130,17 @@ const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }
             <div className="pt-6 flex justify-between">
                 <button
                     onClick={onBack}
-                    className="px-8 py-3 rounded-lg font-semibold border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-all"
+                    className="px-8 py-3 rounded-lg font-semibold border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
                 >
                     Back to Details
                 </button>
                 <button
                     onClick={handleContinue}
                     disabled={selectedRounds.length === 0}
-                    className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 ${selectedRounds.length > 0
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 ${
+                        selectedRounds.length > 0
+                        ? 'gradient-primary text-white shadow-lg hover:opacity-90'
+                        : 'bg-accent text-muted-foreground cursor-not-allowed border border-border'
                         }`}
                 >
                     Configure Rounds Details

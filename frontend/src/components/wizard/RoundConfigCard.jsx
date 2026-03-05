@@ -8,10 +8,10 @@ const RoundConfigCard = ({ round, index, onUpdate }) => {
     };
 
     return (
-        <div className="bg-slate-800/40 border border-slate-700 rounded-2xl overflow-hidden group hover:border-blue-500/30 transition-all duration-300">
-            <div className="bg-slate-800/60 px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="glass-card overflow-hidden group hover:border-primary/30 transition-all duration-300">
+            <div className="bg-accent px-6 py-4 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-sm">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">
                         {index + 1}
                     </div>
                     <div>
@@ -20,10 +20,10 @@ const RoundConfigCard = ({ round, index, onUpdate }) => {
                             name="round_name"
                             value={round.round_name || round.name}
                             onChange={handleChange}
-                            className="bg-transparent border-none text-white font-bold focus:ring-0 p-0 text-lg w-full"
+                            className="bg-transparent border-none text-foreground font-bold focus:ring-0 p-0 text-lg w-full"
                             placeholder="Round Name"
                         />
-                        <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mt-0.5">{round.type}</p>
+                        <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase mt-0.5">{round.type}</p>
                     </div>
                 </div>
             </div>

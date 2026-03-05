@@ -14,11 +14,11 @@ const ScoreBreakdown = ({ breakdown }) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 text-xs text-slate-300">
+    <div className="grid grid-cols-2 gap-3 text-xs text-foreground">
       {entries.map((entry) => (
-        <div key={entry.label} className="flex items-center justify-between rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-2">
-          <span className="text-slate-400">{entry.label}</span>
-          <span className="font-semibold text-slate-100">{Number(entry.value || 0).toFixed(1)}</span>
+        <div key={entry.label} className="flex items-center justify-between rounded-lg border border-border bg-accent px-3 py-2">
+          <span className="text-muted-foreground">{entry.label}</span>
+          <span className="font-semibold text-foreground">{Number(entry.value || 0).toFixed(1)}</span>
         </div>
       ))}
     </div>

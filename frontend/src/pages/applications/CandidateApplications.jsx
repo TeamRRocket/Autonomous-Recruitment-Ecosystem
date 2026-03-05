@@ -125,11 +125,11 @@ const CandidateApplications = () => {
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'PENDING': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-            case 'REVIEWING': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-            case 'SHORTLISTED': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-            case 'REJECTED': return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
-            default: return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+            case 'PENDING': return 'status-pending';
+            case 'REVIEWING': return 'bg-primary/10 text-primary border-primary/20';
+            case 'SHORTLISTED': return 'status-shortlisted';
+            case 'REJECTED': return 'status-rejected';
+            default: return 'bg-muted/10 text-muted-foreground border-border';
         }
     };
 
@@ -144,36 +144,36 @@ const CandidateApplications = () => {
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
-                <p className="text-slate-400 animate-pulse">Loading your applications...</p>
+                <Loader2 className="animate-spin text-primary mb-4" size={40} />
+                <p className="text-muted-foreground animate-pulse">Loading your applications...</p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="space-y-8 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-white tracking-tight">My Applications</h1>
-                    <p className="text-slate-400 mt-2 text-lg">Tracks your journey with {applications.length} active application{applications.length !== 1 ? 's' : ''}.</p>
+                    <h1 className="text-3xl font-extrabold font-heading gradient-text tracking-tight">My Applications</h1>
+                    <p className="text-muted-foreground mt-2 text-lg">Tracks your journey with {applications.length} active application{applications.length !== 1 ? 's' : ''}.</p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
                     <div className="relative group flex-1 sm:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={18} />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />
                         <input
                             type="text"
                             placeholder="Search by job title or location..."
-                            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all text-sm backdrop-blur-sm"
+                            className="w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all text-sm"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
 
-                    <div className="flex items-center space-x-2 bg-slate-900/50 border border-slate-800 rounded-xl px-3 py-1 backdrop-blur-sm">
-                        <Filter size={16} className="text-slate-500" />
+                    <div className="flex items-center space-x-2 glass-card px-3 py-1">
+                        <Filter size={16} className="text-muted-foreground" />
                         <select
-                            className="bg-transparent border-none text-slate-300 focus:outline-none focus:ring-0 text-sm py-1.5 cursor-pointer"
+                            className="bg-transparent border-none text-foreground focus:outline-none focus:ring-0 text-sm py-1.5 cursor-pointer"
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
                         >
@@ -192,28 +192,28 @@ const CandidateApplications = () => {
                     {filteredApplications.map((app) => (
                         <div
                             key={app.id}
-                            className="bg-slate-900/40 hover:bg-slate-800/40 border border-slate-800 hover:border-blue-500/30 rounded-2xl p-5 transition-all duration-300 group relative overflow-hidden"
+                            className="glass-card hover:border-primary/30 rounded-2xl p-5 transition-all duration-300 group relative overflow-hidden animate-slide-up"
                         >
                             {/* Status Accent Bar */}
-                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${app.status === 'SHORTLISTED' ? 'bg-emerald-500' :
-                                    app.status === 'REJECTED' ? 'bg-rose-500' :
-                                        app.status === 'REVIEWING' ? 'bg-blue-500' : 'bg-amber-500'
+                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${app.status === 'SHORTLISTED' ? 'bg-success' :
+                                    app.status === 'REJECTED' ? 'bg-destructive' :
+                                        app.status === 'REVIEWING' ? 'bg-primary' : 'bg-warning'
                                 }`} />
 
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                                 <div className="flex-1">
                                     <div className="flex items-start justify-between mb-4">
                                         <div>
-                                            <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">
+                                            <h3 className="text-xl font-bold text-white group-hover:text-primary transition-colors">
                                                 {app.job_title}
                                             </h3>
                                             <div className="flex flex-wrap items-center gap-4 mt-2">
                                                 <div className="flex items-center text-slate-400 text-sm">
-                                                    <MapPin size={14} className="mr-1.5 text-blue-500/70" />
+                                                    <MapPin size={14} className="mr-1.5 text-primary/70" />
                                                     {app.location || 'Remote'}
                                                 </div>
                                                 <div className="flex items-center text-slate-400 text-sm">
-                                                    <Calendar size={14} className="mr-1.5 text-indigo-500/70" />
+                                                    <Calendar size={14} className="mr-1.5 text-primary/70" />
                                                     Applied on {new Date(app.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                                 </div>
                                             </div>
@@ -233,8 +233,8 @@ const CandidateApplications = () => {
                                     )}
 
                                     {canStartRounds(app) && (
-                                        <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-4 py-2 mt-3">
-                                            <p className="text-indigo-200 text-sm">Next Round: <span className="font-semibold">{String(app.next_round).toUpperCase()}</span></p>
+                                        <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 mt-3">
+                                            <p className="text-cyan-200 text-sm">Next Round: <span className="font-semibold">{String(app.next_round).toUpperCase()}</span></p>
                                         </div>
                                     )}
                                 </div>
@@ -243,7 +243,7 @@ const CandidateApplications = () => {
                                     {canStartRounds(app) && (
                                         <button
                                             onClick={() => handleStartRound(app)}
-                                            className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition-all border border-indigo-500/30"
+                                            className="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-semibold transition-all border border-primary/30"
                                         >
                                             Start Round
                                             <ArrowRight size={16} className="ml-2" />
@@ -268,7 +268,7 @@ const CandidateApplications = () => {
                                     </Link>
 
                                     <button
-                                        className="p-2 bg-slate-800/50 hover:bg-blue-500/10 text-slate-400 hover:text-blue-400 rounded-xl border border-slate-800 hover:border-blue-500/20 transition-all"
+                                        className="p-2 bg-slate-800/50 hover:bg-primary/10 text-slate-400 hover:text-primary rounded-xl border border-slate-800 hover:border-primary/20 transition-all"
                                         title="View Submitted Resume"
                                         onClick={() => window.open(`http://localhost:3000/uploads/resumes/${app.resume_file_path}`, '_blank')}
                                     >
@@ -293,7 +293,7 @@ const CandidateApplications = () => {
                     {!(searchTerm || filterStatus !== 'ALL') && (
                         <Link
                             to="/jobs"
-                            className="mt-8 inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-semibold shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5"
+                            className="mt-8 inline-flex items-center px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-2xl font-semibold shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
                         >
                             Browse Opportunities
                         </Link>

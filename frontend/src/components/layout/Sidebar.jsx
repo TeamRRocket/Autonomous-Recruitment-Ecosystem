@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -10,24 +10,26 @@ import {
     LogOut,
     Building2,
     Sparkles,
-    BarChart3
+    BarChart3,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
-
 
 const Sidebar = () => {
     const { user, profile, logout } = useAuth();
+    const [isCollapsed, setIsCollapsed] = useState(false);
     const role = user?.role;
 
     const candidateLinks = [
-        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { name: 'Find Jobs', path: '/jobs', icon: Briefcase }, // Assuming /jobs is the list
-        { name: 'My Applications', path: '/applications', icon: FileText }, // Placeholder
+        { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+        { name: 'Find Jobs', path: '/jobs', icon: Briefcase },
+        { name: 'My Applications', path: '/applications', icon: FileText },
         { name: 'AI Recommendations', path: '/recommendations', icon: Sparkles },
         { name: 'Profile', path: '/profile', icon: Users },
     ];
 
     const recruiterLinks = [
-        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { name: 'Dashboard', path: '/', icon: LayoutDashboard },
         { name: 'Create Job', path: '/jobs/new', icon: Briefcase },
         { name: 'Applications', path: '/applications', icon: Users },
         { name: 'Candidate Scores', path: '/recruiter/scores', icon: BarChart3 },
@@ -42,91 +44,125 @@ const Sidebar = () => {
     const displayName = profile?.full_name || user?.email?.split('@')[0];
 
     return (
-        <div className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 h-screen fixed left-0 top-0 z-50 transition-all duration-300">
-            {/* Logo */}
-            <div className="flex items-center justify-center h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm">
-                <div className="flex items-center space-x-2">
-                    <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">
+        <div className={`hidden md:flex flex-col bg-sidebar border-r border-sidebar-border h-screen fixed left-0 top-0 z-50 transition-all duration-300 ${isCollapsed ? 'w-[68px]' : 'w-[250px]'}`}>
+            {/* Logo Section */}
+            <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
+                {!isCollapsed && (
+                    <div className="flex items-center space-x-2 animate-fade-in">
+                        <div className="h-8 w-8 gradient-primary rounded-lg flex items-center justify-center text-white font-bold font-heading shadow-lg">
+                            H
+                        </div>
+                        <span className="text-lg font-bold font-heading gradient-text">
+                            HireFlow AI
+                        </span>
+                    </div>
+                )}
+                {isCollapsed && (
+                    <div className="h-8 w-8 gradient-primary rounded-lg flex items-center justify-center text-white font-bold font-heading shadow-lg mx-auto">
                         H
                     </div>
-                    <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400">
-                        HireFlow AI
-                    </span>
-                </div>
+                )}
             </div>
 
+            {/* Toggle Button */}
+            <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="absolute -right-3 top-20 bg-sidebar-accent hover:bg-sidebar-accent/80 border border-sidebar-border rounded-full p-1 shadow-lg transition-all duration-200 z-10"
+            >
+                {isCollapsed ? (
+                    <ChevronRight size={16} className="text-sidebar-foreground" />
+                ) : (
+                    <ChevronLeft size={16} className="text-sidebar-foreground" />
+                )}
+            </button>
+
             {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto py-6 space-y-1.5 px-4">
-                <div className="mb-4 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
-                    Menu
-                </div>
+            <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
+                {!isCollapsed && (
+                    <div className="mb-4 px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Menu
+                    </div>
+                )}
                 {links.map((link) => (
                     <NavLink
                         key={link.path}
                         to={link.path}
-                        end={link.path === '/dashboard'}
+                        end={link.path === '/'}
                         className={({ isActive }) =>
-                            `flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group relative ${isActive
-                                ? 'text-white bg-blue-600/10 border border-blue-600/20 shadow-[0_0_20px_rgba(37,99,235,0.05)]'
-                                : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                            `flex items-center ${isCollapsed ? 'justify-center px-3' : 'px-4'} py-3 text-sm font-medium rounded-lg transition-all duration-200 group relative ${
+                                isActive
+                                    ? 'text-sidebar-primary-foreground bg-sidebar-primary shadow-sm'
+                                    : 'text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent'
                             }`
                         }
+                        title={isCollapsed ? link.name : undefined}
                     >
                         {({ isActive }) => (
                             <>
                                 <link.icon
-                                    size={18}
-                                    className={`mr-3 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300'}`}
+                                    size={20}
+                                    className={`${isCollapsed ? '' : 'mr-3'} transition-colors ${
+                                        isActive ? 'text-sidebar-primary-foreground' : 'text-sidebar-foreground/60 group-hover:text-sidebar-accent-foreground'
+                                    }`}
                                 />
-                                {link.name}
-                                {isActive && (
-                                    <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]"></span>
+                                {!isCollapsed && <span>{link.name}</span>}
+                                {isActive && !isCollapsed && (
+                                    <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-primary shadow-sm"></span>
                                 )}
                             </>
                         )}
                     </NavLink>
                 ))}
-
-
             </nav>
 
-            {/* User Profile Summary & Logout */}
-            <div className="p-4 m-3 mt-0 rounded-2xl bg-gradient-to-b from-slate-800/40 to-slate-900/60 border border-slate-800/50 shadow-xl overflow-hidden relative group">
-                {/* Decorative element */}
-                <div className="absolute -right-4 -top-4 w-12 h-12 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all duration-500"></div>
-
-                <div className="flex items-center mb-4 relative z-10">
+            {/* User Profile Section */}
+            <div className={`p-3 m-3 mt-0 glass-card ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+                <div className={`flex items-center ${isCollapsed ? 'mb-2' : 'mb-3'}`}>
                     <div className="relative">
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 flex items-center justify-center text-blue-400 text-sm font-bold border border-blue-500/30">
+                        <div className={`${isCollapsed ? 'h-10 w-10' : 'h-10 w-10'} rounded-lg bg-sidebar-accent flex items-center justify-center text-sidebar-primary-foreground text-sm font-bold font-heading border border-sidebar-border`}>
                             {initials}
                         </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full shadow-sm"></div>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-success border-2 border-sidebar rounded-full"></div>
                     </div>
-                    <div className="ml-3 overflow-hidden">
-                        <p className="text-sm font-semibold text-white truncate leading-tight">{displayName}</p>
-                        <div className="flex items-center mt-0.5">
-                            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">{role?.toLowerCase()}</p>
-                            <span className="mx-1.5 w-1 h-1 rounded-full bg-slate-700"></span>
-                            <span className="text-[10px] text-blue-400/80 font-medium">Online</span>
+                    {!isCollapsed && (
+                        <div className="ml-3 overflow-hidden">
+                            <p className="text-sm font-semibold text-sidebar-foreground truncate leading-tight">{displayName}</p>
+                            <div className="flex items-center mt-0.5">
+                                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                                    {role?.toLowerCase()}
+                                </p>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 relative z-10">
-                    <NavLink
-                        to="/profile"
-                        className="flex items-center justify-center py-2 px-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg text-[11px] font-medium text-slate-300 hover:text-white transition-all border border-slate-700/30"
-                    >
-                        Profile
-                    </NavLink>
+                {!isCollapsed && (
+                    <div className="grid grid-cols-2 gap-2">
+                        <NavLink
+                            to="/profile"
+                            className="flex items-center justify-center py-2 px-3 bg-sidebar-accent hover:bg-sidebar-accent/80 rounded-lg text-[11px] font-medium text-sidebar-foreground transition-all border border-sidebar-border"
+                        >
+                            Profile
+                        </NavLink>
+                        <button
+                            onClick={logout}
+                            className="flex items-center justify-center py-2 px-3 bg-destructive/10 hover:bg-destructive/20 rounded-lg text-[11px] font-medium text-destructive transition-all border border-destructive/20"
+                        >
+                            <LogOut size={12} className="mr-1.5" />
+                            Logout
+                        </button>
+                    </div>
+                )}
+
+                {isCollapsed && (
                     <button
                         onClick={logout}
-                        className="flex items-center justify-center py-2 px-3 bg-red-500/5 hover:bg-red-500/10 rounded-lg text-[11px] font-medium text-red-400/80 hover:text-red-400 transition-all border border-red-500/10 hover:border-red-500/20"
+                        className="flex items-center justify-center p-2 bg-destructive/10 hover:bg-destructive/20 rounded-lg text-destructive transition-all border border-destructive/20 w-full"
+                        title="Logout"
                     >
-                        <LogOut size={12} className="mr-1.5" />
-                        Logout
+                        <LogOut size={16} />
                     </button>
-                </div>
+                )}
             </div>
         </div>
     );

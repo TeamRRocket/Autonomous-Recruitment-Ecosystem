@@ -2,7 +2,8 @@ import axios from 'axios';
 import { pool } from '../../config/db.js';
 import AppError from '../../utils/AppError.js';
 
-const AI_SERVICE_URL = 'http://localhost:8000/match-jobs';
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+const MATCH_JOBS_ENDPOINT = `${AI_SERVICE_URL}/match-jobs`;
 
 // Simple in-memory cache
 const recommendationCache = new Map();
@@ -38,7 +39,7 @@ export const getJobRecommendations = async (userId) => {
 
     // 2. Fetch active published jobs - Limit to most recent 20 for performance
     const jobsResult = await pool.query(
-        `SELECT id as job_id, title as job_title, required_skills 
+        `SELECT id as job_id, title as job_title, requirements 
          FROM jobs 
          WHERE status = 'PUBLISHED' 
          AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
@@ -54,12 +55,12 @@ export const getJobRecommendations = async (userId) => {
 
     // 3. Call AI Service for matching
     try {
-        const response = await axios.post(AI_SERVICE_URL, {
+        const response = await axios.post(MATCH_JOBS_ENDPOINT, {
             candidate_skills: candidateSkills,
             jobs: activeJobs.map(job => ({
                 job_id: job.job_id,
                 job_title: job.job_title,
-                required_skills: job.required_skills || []
+                required_skills: job.requirements || []
             }))
         });
 

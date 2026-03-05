@@ -38,23 +38,23 @@ const RecruiterOnboarding = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0f172a] to-black flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-xl w-full space-y-8 glass-panel p-8 md:p-10 relative">
+        <div className="min-h-screen bg-background flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 animate-fade-in">
+            <div className="max-w-xl w-full space-y-8 glass-card p-8 md:p-10 relative">
                 {/* Decorative blob */}
-                <div className="absolute bottom-0 left-0 -ml-4 -mb-4 w-32 h-32 bg-purple-500 rounded-full blur-3xl opacity-20 animate-pulse"></div>
+                <div className="absolute bottom-0 left-0 -ml-4 -mb-4 w-32 h-32 bg-primary rounded-full blur-3xl opacity-20 animate-pulse"></div>
 
                 <div className="text-center relative z-10">
-                    <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
+                    <h2 className="text-3xl font-bold font-heading gradient-text">
                         Complete Your Profile
                     </h2>
-                    <p className="mt-2 text-sm text-slate-400">
+                    <p className="mt-2 text-sm text-muted-foreground">
                         Add your name to start creating job postings.
                     </p>
                 </div>
 
                 <form className="mt-8 space-y-6 relative z-10" onSubmit={handleSubmit}>
                     {error && (
-                        <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded relative text-sm text-center" role="alert">
+                        <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded relative text-sm text-center" role="alert">
                             {error}
                         </div>
                     )}
@@ -74,7 +74,7 @@ const RecruiterOnboarding = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 focus:ring-offset-slate-900 transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-lg text-white gradient-primary hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-all duration-200 transform hover:scale-[1.02] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? (
                                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -89,7 +89,7 @@ const RecruiterOnboarding = () => {
                 <div className="text-center mt-6">
                     <button
                         onClick={handleLogout}
-                        className="text-sm text-slate-400 hover:text-white transition-colors duration-200 underline decoration-slate-600 hover:decoration-white"
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 underline decoration-border hover:decoration-foreground"
                     >
                         Log Out
                     </button>

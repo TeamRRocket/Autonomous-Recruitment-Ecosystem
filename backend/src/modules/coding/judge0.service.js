@@ -4,6 +4,11 @@ import AppError from '../../utils/AppError.js';
 // Public Judge0 CE
 const JUDGE0_BASE_URL = 'https://ce.judge0.com';
 
+// Polling configuration
+const POLL_INTERVAL_MS = 650; // Time between polls
+const BATCH_POLL_INTERVAL_MS = 800; // Time between batch polls
+const POLL_TIMEOUT_MS = 60000; // Maximum time to wait for results
+
 const api = axios.create({
   baseURL: JUDGE0_BASE_URL,
   timeout: 60000,
@@ -46,7 +51,7 @@ export const run = async ({ language_id, source_code, stdin }) => {
   }
 
   const startedAt = Date.now();
-  while (Date.now() - startedAt < 60000) {
+  while (Date.now() - startedAt < POLL_TIMEOUT_MS) {
     try {
       const res = await api.get(
         `/submissions/${encodeURIComponent(token)}?base64_encoded=true`,
@@ -77,7 +82,7 @@ export const run = async ({ language_id, source_code, stdin }) => {
       }
     }
 
-    await new Promise((r) => setTimeout(r, 650));
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
 
   throw new AppError('Judge0 timed out while waiting for results. Please try again.', 504);
@@ -113,7 +118,7 @@ export const pollBatch = async (tokens) => {
   const joined = tokens.join(',');
   const startedAt = Date.now();
 
-  while (Date.now() - startedAt < 60000) {
+  while (Date.now() - startedAt < POLL_TIMEOUT_MS) {
     try {
       const res = await api.get(`/submissions/batch?tokens=${encodeURIComponent(joined)}&base64_encoded=true`);
       const subs = res.data.submissions || [];
@@ -133,7 +138,7 @@ export const pollBatch = async (tokens) => {
         }));
       }
 
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, BATCH_POLL_INTERVAL_MS));
     } catch (err) {
       const message =
         err.code === 'ECONNABORTED'

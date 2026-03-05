@@ -64,13 +64,13 @@ const CandidateOnboarding = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0f172a] to-black flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-xl w-full space-y-8 glass-panel p-8 relative">
+        <div className="min-h-screen bg-background flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 animate-fade-in">
+            <div className="max-w-xl w-full space-y-8 glass-card p-8 relative">
                 <div className="text-center">
-                    <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400">
+                    <h2 className="text-3xl font-bold font-heading gradient-text">
                         Candidate Profile
                     </h2>
-                    <p className="mt-2 text-sm text-slate-400">Step {currentStep + 1} of {steps.length}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">Step {currentStep + 1} of {steps.length}</p>
                 </div>
 
                 <Stepper steps={steps} currentStep={currentStep} />
@@ -120,7 +120,7 @@ const CandidateOnboarding = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg shadow-blue-500/20 transition-all font-semibold"
+                            className="w-full px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-lg shadow-primary/20 transition-all font-semibold"
                         >
                             {loading ? 'Saving...' : currentStep === steps.length - 1 ? 'Complete Profile' : 'Next Step'}
                         </button>

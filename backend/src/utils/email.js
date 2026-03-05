@@ -31,16 +31,17 @@ const getTransporter = () => {
 const sendEmail = async (options) => {
     // Check if using placeholder credentials
     if (!process.env.EMAIL_USER || process.env.EMAIL_USER.includes('your_email')) {
+        // Development mode - log email to console
         console.log('=================================================');
-        console.log('EMAIL SERVICE [MOCK] - CHECK HERE FOR LINK');
+        console.log('EMAIL SERVICE [DEV MODE] - Email would be sent:');
         console.log(`To: ${options.email}`);
         console.log(`Subject: ${options.subject}`);
         console.log(`Message: ${options.message}`);
         console.log('=================================================');
-        return;
+        return { success: true, mode: 'development' };
     }
 
-    // Real Email Implementation
+    // Production Email Implementation
     try {
         const transporter = getTransporter();
         if (!cachedTransporterVerified) {
@@ -49,6 +50,7 @@ const sendEmail = async (options) => {
                 cachedTransporterVerified = true;
             } catch (e) {
                 console.error('Email transporter verification failed:', e);
+                throw new Error('Email service configuration is invalid');
             }
         }
 
@@ -57,16 +59,15 @@ const sendEmail = async (options) => {
             to: options.email,
             subject: options.subject,
             text: options.message
-            // html: options.html // could add html support later
         };
 
         const info = await transporter.sendMail(mailOptions);
         console.log(`Email sent successfully to ${options.email}`);
         if (info?.messageId) console.log(`MessageId: ${info.messageId}`);
+        return { success: true, messageId: info?.messageId };
     } catch (error) {
         console.error(`Error sending email to ${options?.email}:`, error);
-        // Fallback to console log if email fails even with creds
-        console.log('FALLBACK LINK LOG:', options.message);
+        throw new Error(`Failed to send email: ${error.message}`);
     }
 };
 

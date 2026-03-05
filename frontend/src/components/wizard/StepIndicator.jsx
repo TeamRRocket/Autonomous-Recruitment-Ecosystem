@@ -15,17 +15,17 @@ const StepIndicator = ({ currentStep, steps }) => {
                             {/* Line connecting steps */}
                             {index !== 0 && (
                                 <div
-                                    className={`absolute top-5 -left-1/2 w-full h-0.5 -z-10 ${isCompleted ? 'bg-blue-600' : 'bg-slate-700'
+                                    className={`absolute top-5 -left-1/2 w-full h-0.5 -z-10 ${isCompleted ? 'bg-primary' : 'bg-border'
                                         }`}
                                 />
                             )}
 
                             <div
                                 className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${isActive
-                                        ? 'bg-blue-600 border-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
+                                        ? 'bg-primary border-primary text-white shadow-[0_0_15px_hsl(var(--primary)/0.4)]'
                                         : isCompleted
-                                            ? 'bg-blue-600 border-blue-600 text-white'
-                                            : 'bg-slate-900 border-slate-700 text-slate-500'
+                                            ? 'bg-primary border-primary text-white'
+                                            : 'bg-accent border-border text-muted-foreground'
                                     }`}
                             >
                                 {isCompleted ? (
@@ -36,7 +36,7 @@ const StepIndicator = ({ currentStep, steps }) => {
                             </div>
 
                             <span
-                                className={`mt-2 text-xs font-semibold uppercase tracking-wider ${isActive ? 'text-blue-400' : 'text-slate-500'
+                                className={`mt-2 text-xs font-semibold uppercase tracking-wider ${isActive ? 'text-primary' : 'text-muted-foreground'
                                     }`}
                             >
                                 {step.label}

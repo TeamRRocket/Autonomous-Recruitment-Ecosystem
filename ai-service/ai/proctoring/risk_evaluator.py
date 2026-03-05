@@ -2,15 +2,12 @@
 Risk Evaluator - LLM-based behavioral risk assessment
 Analyzes aggregated proctoring events and provides risk scoring
 """
-import os
-import json
-import requests
 from typing import Dict
+
+from ..config import config
+from ..utils import parse_json_response, call_llm_api
+from ..utils.llm_client import extract_llm_content
 from .models import EventSummary
-
-
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 def generate_llm_prompt(summary: EventSummary) -> str:
@@ -37,27 +34,38 @@ Session Summary:
 
 Your task is to evaluate the risk level of potential cheating based on these behavioral indicators.
 
-Guidelines:
-- No face detected: High concern (candidate may have left or is avoiding camera)
-- Multiple faces: Very high concern (unauthorized assistance)
-- Looking away frequently: Medium concern (may be looking at notes or another screen)
-- Tab switches: High concern (accessing external resources)
-- Copy/paste: Very high concern (copying answers from external sources)
-- Phone detected: Very high concern (using phone for assistance)
+Guidelines for scoring (BE STRICT):
+- No face detected: HIGH CONCERN (10 points each) - candidate may have left or is avoiding camera
+- Multiple faces: CRITICAL CONCERN (15 points each) - unauthorized assistance detected
+- Looking away frequently: MEDIUM CONCERN (3 points each) - may be looking at notes or another screen
+- Tab switches: HIGH CONCERN (10 points each) - accessing external resources
+- Copy/paste: CRITICAL CONCERN (20 points each) - copying answers from external sources
+- Phone detected: CRITICAL CONCERN (25 points each) - using phone for assistance
+- Window blur: LOW-MEDIUM CONCERN (4 points each) - distraction or potential window switching
+
+Score calculation example:
+- 1 phone detected = 25 points (HIGH risk)
+- 3 looking away + 2 tab switches = (3*3) + (2*10) = 29 points (LOW risk)
+- 1 phone + 2 tab switches = 25 + 20 = 45 points (MEDIUM risk)
+- 2 phones + 5 tab switches = 50 + 50 = 100 points (HIGH risk)
+
+Risk Levels:
+- Low (0-39): Minor or no violations detected
+- Medium (40-69): Moderate concerns, needs attention
+- High (70-100): Serious violations, likely cheating
+
+BE MORE SENSITIVE TO VIOLATIONS. Even a single phone detection should result in at least MEDIUM risk.
 
 Provide:
-1. Risk score (0-100, where 0 is no risk and 100 is extremely high risk)
-2. Risk level (Low/Medium/High)
-   - Low: 0-39
-   - Medium: 40-69
-   - High: 70-100
-3. Brief reasoning explanation (2-3 sentences)
+1. Risk score (0-100, calculated strictly according to guidelines)
+2. Risk level (Low/Medium/High based on score ranges above)
+3. Brief reasoning explanation (2-3 sentences explaining the specific violations detected)
 
 Return ONLY valid JSON in this exact format:
 {{
-  "risk_score": <0-100>,
+  "risk_score": <number between 0-100>,
   "risk_level": "<Low|Medium|High>",
-  "reason": "<explanation>"
+  "reason": "<explanation of specific violations>"
 }}"""
     
     return prompt
@@ -73,53 +81,30 @@ def evaluate_risk_with_llm(summary: EventSummary) -> Dict:
     Returns:
         Dictionary with risk_score, risk_level, and reason
     """
-    if not OPENROUTER_API_KEY:
-        print("⚠ OPENROUTER_API_KEY not set, using fallback risk calculation")
+    print(f"🔍 Evaluating risk for session: {summary.total_no_face} no_face, {summary.total_multiple_face} multi_face, {summary.total_phone_detected} phone, {summary.total_tab_switch} tab_switch")
+    
+    if not config.is_llm_configured():
+        print("⚠ LLM not configured, using fallback risk calculation")
         return calculate_fallback_risk(summary)
     
     try:
+        print("🤖 Calling LLM for risk evaluation...")
         prompt = generate_llm_prompt(summary)
         
-        response = requests.post(
-            OPENROUTER_URL,
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:3000",
-                "X-Title": "HireFlow AI Proctoring"
-            },
-            json={
-                "model": "anthropic/claude-3.5-sonnet",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "temperature": 0.3,
-                "max_tokens": 500
-            },
-            timeout=30
+        response_json = call_llm_api(
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=800,
+            timeout=60
         )
         
-        response.raise_for_status()
-        response_json = response.json()
-        
-        if "choices" not in response_json or not response_json["choices"]:
+        content = extract_llm_content(response_json)
+        if not content:
             print("⚠ Invalid LLM response, using fallback")
             return calculate_fallback_risk(summary)
         
-        content = response_json["choices"][0]["message"]["content"]
-        
-        # Parse JSON from response (handle markdown code blocks)
-        content = content.strip()
-        if content.startswith("```"):
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-            content = content.strip()
-        
-        result = json.loads(content)
+        print(f"✓ LLM response received: {content[:200]}...")
+        result = parse_json_response(content)
         
         # Validate response
         if "risk_score" not in result or "risk_level" not in result or "reason" not in result:
@@ -161,39 +146,39 @@ def calculate_fallback_risk(summary: EventSummary) -> Dict:
     risk_score = 0
     concerns = []
     
-    # No face detected - 5 points each
+    # No face detected - 8 points each (increased from 5)
     if summary.total_no_face > 0:
-        risk_score += summary.total_no_face * 5
+        risk_score += summary.total_no_face * 8
         concerns.append(f"face absent {summary.total_no_face} times")
     
-    # Multiple faces - 10 points each (very serious)
+    # Multiple faces - 15 points each (increased from 10)
     if summary.total_multiple_face > 0:
-        risk_score += summary.total_multiple_face * 10
+        risk_score += summary.total_multiple_face * 15
         concerns.append(f"multiple faces {summary.total_multiple_face} times")
     
-    # Looking away - 2 points each
+    # Looking away - 3 points each (increased from 2)
     if summary.total_looking_away > 0:
-        risk_score += summary.total_looking_away * 2
+        risk_score += summary.total_looking_away * 3
         concerns.append(f"looking away {summary.total_looking_away} times")
     
-    # Tab switches - 8 points each
+    # Tab switches - 10 points each (increased from 8)
     if summary.total_tab_switch > 0:
-        risk_score += summary.total_tab_switch * 8
+        risk_score += summary.total_tab_switch * 10
         concerns.append(f"{summary.total_tab_switch} tab switches")
     
-    # Window blur - 3 points each
+    # Window blur - 4 points each (increased from 3)
     if summary.total_window_blur > 0:
-        risk_score += summary.total_window_blur * 3
+        risk_score += summary.total_window_blur * 4
         concerns.append(f"{summary.total_window_blur} window blur events")
     
-    # Copy/paste - 15 points each (very serious)
+    # Copy/paste - 20 points each (increased from 15)
     if summary.total_copy_paste > 0:
-        risk_score += summary.total_copy_paste * 15
+        risk_score += summary.total_copy_paste * 20
         concerns.append(f"{summary.total_copy_paste} copy/paste attempts")
     
-    # Phone detected - 20 points each (very serious)
+    # Phone detected - 25 points each (increased from 20)
     if summary.total_phone_detected > 0:
-        risk_score += summary.total_phone_detected * 20
+        risk_score += summary.total_phone_detected * 25
         concerns.append(f"phone detected {summary.total_phone_detected} times")
     
     # Cap at 100

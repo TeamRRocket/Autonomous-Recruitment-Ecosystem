@@ -150,193 +150,241 @@ const JobDetails = () => {
     const isCandidate = user?.role === 'CANDIDATE';
 
     return (
-        <div className="min-h-screen bg-slate-900 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-4xl mx-auto">
-                <Link to="/dashboard" className="text-slate-400 hover:text-white mb-6 flex items-center gap-2 transition-colors">
-                    &larr; Back to Dashboard
-                </Link>
-
-                <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl overflow-hidden">
-                    {/* Header */}
-                    <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-8 py-8 border-b border-slate-700/50">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h1 className="text-3xl font-bold text-white mb-2">{job.title}</h1>
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${job.status === 'PUBLISHED' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                job.status === 'CLOSED' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                }`}>
-                                {job.status}
-                            </span>
-                        </div>
-
-                        <div className="mt-6 flex flex-wrap gap-4 text-sm text-slate-300">
-                            {job.organization_name && (
-                                <div className="flex items-center bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/20 text-blue-400 font-bold">
-                                    <span className="mr-2">🏢</span> {job.organization_name}
+        <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 animate-fade-in">
+            <div className="max-w-6xl mx-auto">
+                <div className="glass-card overflow-hidden">
+                    <div className="p-8">
+                        {/* Header Section */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* Main Content - Left Side */}
+                            <div className="lg:col-span-2 space-y-8">
+                                {/* Title and Company */}
+                                <div>
+                                    <h1 className="text-4xl font-bold font-heading text-foreground mb-2">{job.title}</h1>
+                                    {job.organization_name && (
+                                        <p className="text-xl text-muted-foreground">{job.organization_name}</p>
+                                    )}
                                 </div>
-                            )}
-                            {job.location && (
-                                <div className="flex items-center bg-slate-700/30 px-3 py-1.5 rounded-lg border border-slate-700">
-                                    <span className="mr-2">📍</span> {job.location}
-                                </div>
-                            )}
-                            {job.type && (
-                                <div className="flex items-center bg-slate-700/30 px-3 py-1.5 rounded-lg border border-slate-700 font-medium">
-                                    <span className="mr-2">💼</span> {job.type}
-                                </div>
-                            )}
-                            {job.experience_level && (
-                                <div className="flex items-center bg-slate-700/30 px-3 py-1.5 rounded-lg border border-slate-700 capitalize font-medium">
-                                    <span className="mr-2">📊</span> {job.experience_level.toLowerCase()} Level
-                                </div>
-                            )}
-                        </div>
-                    </div>
 
-                    <div className="p-8 space-y-10">
-                        <div>
-                            <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                                <span className="bg-blue-500/10 p-2 rounded-lg text-blue-400 mr-3">📄</span>
-                                Description
-                            </h3>
-                            <div className="text-slate-300 leading-relaxed whitespace-pre-wrap pl-11 text-lg">
-                                {job.description}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                            <div>
-                                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                                    <span className="bg-purple-500/10 p-2 rounded-lg text-purple-400 mr-3">✅</span>
-                                    Minimum Qualifications
-                                </h3>
-                                <div className="pl-11 space-y-4">
-                                    {job.degree && (
-                                        <div className="flex items-start text-slate-300 bg-slate-700/20 p-3 rounded-lg border border-slate-700/30">
-                                            <span className="text-blue-400 mr-2">🎓</span>
-                                            <div>
-                                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Education</p>
-                                                <p>{job.degree} or equivalent practical experience.</p>
-                                            </div>
+                                {/* Job Meta Info */}
+                                <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
+                                    {job.location && (
+                                        <div className="flex items-center gap-2">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                            <span>{job.location}</span>
                                         </div>
                                     )}
-                                    <ul className="grid gap-3">
-                                        {job.requirements && job.requirements.map((req, index) => (
-                                            <li key={index} className="flex items-start text-slate-300 bg-slate-700/10 p-3 rounded-lg border border-slate-800/50">
-                                                <span className="text-purple-400 mr-3 mt-1.5 h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0"></span>
-                                                {req}
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    {job.type && (
+                                        <div className="flex items-center gap-2">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                            <span>{job.type}</span>
+                                        </div>
+                                    )}
+                                    {job.salary_range && (
+                                        <div className="flex items-center gap-2">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <span>{job.salary_range}</span>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* About the Role */}
+                                <div>
+                                    <h2 className="text-2xl font-bold font-heading text-foreground mb-4">About the Role</h2>
+                                    <div className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                        {job.description}
+                                    </div>
+                                </div>
+
+                                {/* Requirements */}
+                                {job.requirements && job.requirements.length > 0 && (
+                                    <div>
+                                        <h2 className="text-2xl font-bold font-heading text-foreground mb-4">Requirements</h2>
+                                        <ul className="space-y-3">
+                                            {job.degree && (
+                                                <li className="flex items-start text-foreground">
+                                                    <span className="text-primary mr-3 mt-1">•</span>
+                                                    <span>{job.degree} degree or equivalent</span>
+                                                </li>
+                                            )}
+                                            {job.requirements.map((req, index) => (
+                                                <li key={index} className="flex items-start text-foreground">
+                                                    <span className="text-primary mr-3 mt-1">•</span>
+                                                    <span>{req}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {/* Skills Required */}
+                                {job.requirements && job.requirements.length > 0 && (
+                                    <div>
+                                        <h2 className="text-2xl font-bold font-heading text-foreground mb-4">Skills Required</h2>
+                                        <div className="flex flex-wrap gap-2">
+                                            {job.requirements.slice(0, 6).map((req, idx) => {
+                                                // Extract skill names from requirement text (simple approach)
+                                                const skillMatch = req.match(/\b[A-Z][a-zA-Z.]+(?:\s+[A-Z][a-zA-Z.]+)*\b/g);
+                                                const skills = skillMatch ? skillMatch.slice(0, 2) : [req.split(' ').slice(0, 2).join(' ')];
+                                                return skills.map((skill, i) => (
+                                                    <span key={`${idx}-${i}`} className="px-4 py-2 bg-primary/10 text-primary rounded-lg border border-primary/20 text-sm font-medium">
+                                                        {skill}
+                                                    </span>
+                                                ));
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Preferred Qualifications */}
+                                {job.preferred_qualifications && job.preferred_qualifications.length > 0 && (
+                                    <div>
+                                        <h2 className="text-2xl font-bold font-heading text-foreground mb-4">Preferred Qualifications</h2>
+                                        <ul className="space-y-3">
+                                            {job.preferred_qualifications.map((qual, index) => (
+                                                <li key={index} className="flex items-start text-foreground">
+                                                    <span className="text-success mr-3 mt-1">•</span>
+                                                    <span>{qual}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
 
-                            {job.preferred_qualifications && job.preferred_qualifications.length > 0 && (
-                                <div>
-                                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                                        <span className="bg-emerald-500/10 p-2 rounded-lg text-emerald-400 mr-3">🌟</span>
-                                        Preferred Qualifications
-                                    </h3>
-                                    <ul className="grid gap-3 pl-11">
-                                        {job.preferred_qualifications.map((qual, index) => (
-                                            <li key={index} className="flex items-start text-slate-300 bg-slate-700/10 p-3 rounded-lg border border-slate-800/50">
-                                                <span className="text-emerald-400 mr-3 mt-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                                                {qual}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
+                            {/* Right Sidebar - Apply Section */}
+                            <div className="lg:col-span-1">
+
+                                {isCandidate && job.status === 'PUBLISHED' && (
+                                    <div className="glass-card p-6 sticky top-8">
+                                        <h3 className="text-xl font-bold font-heading text-foreground mb-6">Apply Now</h3>
+                                        {hasApplied ? (
+                                            <div className="bg-success/10 border border-success/20 rounded-lg p-4">
+                                                <p className="text-success font-medium">✓ You have already applied to this job</p>
+                                                {myApplication?.status && (
+                                                    <p className="text-sm text-muted-foreground mt-2">
+                                                        Status: <span className="font-semibold text-foreground">{myApplication.status}</span>
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-muted-foreground mb-2">
+                                                        Upload your resume (PDF)
+                                                    </label>
+                                                    <div className="relative">
+                                                        <input
+                                                            id="resume-upload"
+                                                            type="file"
+                                                            accept="application/pdf"
+                                                            onChange={handleFileChange}
+                                                            className="hidden"
+                                                        />
+                                                        <label
+                                                            htmlFor="resume-upload"
+                                                            className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer bg-accent hover:bg-accent/80 transition-colors"
+                                                        >
+                                                            <svg className="w-8 h-8 text-muted-foreground mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                            </svg>
+                                                            <span className="text-sm text-muted-foreground">
+                                                                {resumeFile ? resumeFile.name : 'Choose file'}
+                                                            </span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={handleApply}
+                                                    disabled={isApplying || !resumeFile}
+                                                    className="w-full gradient-primary text-white font-semibold py-3 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                >
+                                                    {isApplying ? 'Submitting...' : 'Submit Application'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Status Badge for Recruiter */}
+                                {isRecruiter && (
+                                    <div className="glass-card p-6 sticky top-8">
+                                        <div className="mb-4">
+                                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Job Status</h3>
+                                            <span className={`${
+                                                job.status === 'PUBLISHED' ? 'status-published' :
+                                                job.status === 'CLOSED' ? 'status-closed' :
+                                                'status-draft'
+                                            }`}>
+                                                {job.status}
+                                            </span>
+                                        </div>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Applicants:</span>
+                                                <span className="font-semibold text-foreground">{applications.length}</span>
+                                            </div>
+                                            {job.experience_level && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">Level:</span>
+                                                    <span className="font-semibold text-foreground capitalize">{job.experience_level.toLowerCase()}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    {isCandidate && job.status === 'PUBLISHED' && (
-                        <div className="px-8 py-6 bg-slate-900/50 border-t border-slate-700 space-y-4">
-                            {hasApplied ? (
-                                <div className="space-y-4">
-                                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-                                        <p className="text-green-400 font-medium">✓ You have already applied to this job</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                                            Upload Resume (PDF only)
-                                        </label>
-                                        <input
-                                            id="resume-upload"
-                                            type="file"
-                                            accept="application/pdf"
-                                            onChange={handleFileChange}
-                                            className="block w-full text-sm text-slate-300
-                                                file:mr-4 file:py-2 file:px-4
-                                                file:rounded-lg file:border-0
-                                                file:text-sm file:font-semibold
-                                                file:bg-indigo-600 file:text-white
-                                                hover:file:bg-indigo-700
-                                                file:cursor-pointer
-                                                bg-slate-700/30 border border-slate-600 rounded-lg"
-                                        />
-                                        {resumeFile && (
-                                            <p className="mt-2 text-sm text-green-400">Selected: {resumeFile.name}</p>
-                                        )}
-                                    </div>
-                                    <button
-                                        onClick={handleApply}
-                                        disabled={isApplying || !resumeFile}
-                                        className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-lg shadow-blue-500/20 transition-all transform hover:-translate-y-0.5 disabled:transform-none"
-                                    >
-                                        {isApplying ? 'Submitting...' : 'Apply for this Job'}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
                     {isRecruiter && (
-                        <div className="px-8 py-6 bg-slate-900/50 border-t border-slate-700">
+                        <div className="px-8 py-6 border-t border-border">
                             <div className="mb-8">
-                                <h3 className="text-lg font-semibold text-white mb-4">Scores</h3>
+                                <h3 className="text-lg font-semibold text-foreground font-heading mb-4">Candidate Scores</h3>
 
                                 {scoresLoading && (
-                                    <p className="text-slate-400">Loading scores...</p>
+                                    <p className="text-muted-foreground">Loading scores...</p>
                                 )}
 
                                 {!scoresLoading && (!scores?.candidates || scores.candidates.length === 0) && (
-                                    <p className="text-slate-400">No candidates yet to display scores.</p>
+                                    <p className="text-muted-foreground">No candidates yet to display scores.</p>
                                 )}
 
                                 {!scoresLoading && (scores?.candidates || []).length > 0 && (
                                     <div className="space-y-3">
                                         {(scores?.candidates || []).map((row) => (
-                                            <div key={row.candidate.id} className="bg-slate-800/40 border border-slate-700 rounded-lg p-4">
+                                            <div key={row.candidate.id} className="glass-card p-4">
                                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                                     <div>
-                                                        <p className="text-white font-semibold">{row.candidate.name}</p>
-                                                        <p className="text-xs text-slate-500 uppercase tracking-widest">{row.application.status}</p>
+                                                        <p className="text-foreground font-semibold">{row.candidate.name}</p>
+                                                        <p className="text-xs text-muted-foreground uppercase tracking-widest">{row.application.status}</p>
                                                     </div>
                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                                                        <div className="bg-slate-900/50 border border-slate-700 rounded-md px-3 py-2">
-                                                            <p className="text-xs text-slate-500">Resume</p>
-                                                            <p className="text-white font-semibold">{row.scores.resume.score ?? '--'}</p>
+                                                        <div className="bg-accent border border-border rounded-md px-3 py-2">
+                                                            <p className="text-xs text-muted-foreground">Resume</p>
+                                                            <p className="text-foreground font-semibold">{row.scores.resume.score ?? '--'}</p>
                                                         </div>
-                                                        <div className="bg-slate-900/50 border border-slate-700 rounded-md px-3 py-2">
-                                                            <p className="text-xs text-slate-500">Aptitude</p>
-                                                            <p className="text-white font-semibold">{row.scores.aptitude.score ?? '--'}</p>
-                                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">{row.scores.aptitude.status}</p>
+                                                        <div className="bg-accent border border-border rounded-md px-3 py-2">
+                                                            <p className="text-xs text-muted-foreground">Aptitude</p>
+                                                            <p className="text-foreground font-semibold">{row.scores.aptitude.score ?? '--'}</p>
+                                                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{row.scores.aptitude.status}</p>
                                                         </div>
-                                                        <div className="bg-slate-900/50 border border-slate-700 rounded-md px-3 py-2">
-                                                            <p className="text-xs text-slate-500">DSA</p>
-                                                            <p className="text-white font-semibold">{row.scores.dsa.score ?? '--'}</p>
-                                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">{row.scores.dsa.status}</p>
+                                                        <div className="bg-accent border border-border rounded-md px-3 py-2">
+                                                            <p className="text-xs text-muted-foreground">DSA</p>
+                                                            <p className="text-foreground font-semibold">{row.scores.dsa.score ?? '--'}</p>
+                                                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{row.scores.dsa.status}</p>
                                                         </div>
-                                                        <div className="bg-slate-900/50 border border-slate-700 rounded-md px-3 py-2">
-                                                            <p className="text-xs text-slate-500">Coding</p>
-                                                            <p className="text-white font-semibold">{row.scores.coding.avg_score_percent ?? '--'}{row.scores.coding.avg_score_percent != null ? '%' : ''}</p>
-                                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">{(row.scores.coding.rounds || []).length} rounds</p>
+                                                        <div className="bg-accent border border-border rounded-md px-3 py-2">
+                                                            <p className="text-xs text-muted-foreground">Coding</p>
+                                                            <p className="text-foreground font-semibold">{row.scores.coding.avg_score_percent ?? '--'}{row.scores.coding.avg_score_percent != null ? '%' : ''}</p>
+                                                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">{(row.scores.coding.rounds || []).length} rounds</p>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -346,25 +394,25 @@ const JobDetails = () => {
                                 )}
                             </div>
 
-                            <h3 className="text-lg font-semibold text-white mb-4">Applicants ({applications.length})</h3>
+                            <h3 className="text-lg font-semibold text-foreground font-heading mb-4">Applicants ({applications.length})</h3>
                             {applications.length === 0 ? (
-                                <p className="text-slate-400">No applicants yet for this job.</p>
+                                <p className="text-muted-foreground">No applicants yet for this job.</p>
                             ) : (
                                 <div className="space-y-3">
                                     {applications.map((app) => (
-                                        <div key={app.id} className="bg-slate-700/30 border border-slate-600 rounded-lg p-4">
+                                        <div key={app.id} className="glass-card p-4">
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <h4 className="text-white font-medium">{app.candidate_name}</h4>
+                                                    <h4 className="text-foreground font-semibold font-heading">{app.candidate_name}</h4>
                                                     {app.years_of_experience && (
-                                                        <p className="text-sm text-slate-400 mt-1">
+                                                        <p className="text-sm text-muted-foreground mt-1">
                                                             {app.years_of_experience} years of experience
                                                         </p>
                                                     )}
                                                     {app.primary_skills && app.primary_skills.length > 0 && (
                                                         <div className="flex flex-wrap gap-2 mt-2">
                                                             {app.primary_skills.slice(0, 5).map((skill, idx) => (
-                                                                <span key={idx} className="px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded text-xs border border-indigo-500/20">
+                                                                <span key={idx} className="px-2 py-1 bg-primary/10 text-primary rounded text-xs border border-primary/20">
                                                                     {skill}
                                                                 </span>
                                                             ))}
@@ -375,7 +423,7 @@ const JobDetails = () => {
                                                     <select
                                                         value={app.status}
                                                         onChange={(e) => handleStatusUpdate(app.id, e.target.value)}
-                                                        className="px-3 py-1 rounded-lg bg-slate-700/50 border border-slate-600 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                        className="px-3 py-1 rounded-lg bg-input border border-border text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-ring"
                                                     >
                                                         <option value="PENDING">PENDING</option>
                                                         <option value="REVIEWING">REVIEWING</option>
@@ -390,7 +438,7 @@ const JobDetails = () => {
                                                         href={`http://localhost:3000/uploads/resumes/${app.resume_file_path}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="text-sm text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-2"
+                                                        className="text-sm text-primary hover:text-primary/80 inline-flex items-center gap-2"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

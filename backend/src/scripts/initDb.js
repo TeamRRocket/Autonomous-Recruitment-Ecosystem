@@ -296,6 +296,38 @@ const createTables = async () => {
         `);
         console.log('Coding submissions table checked/created.');
 
+        // Create DSA Bank Problems first (referenced by other DSA tables)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS dsa_bank_problems (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                dataset_id VARCHAR(64) UNIQUE NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                difficulty VARCHAR(16) NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
+                problem_statement TEXT NOT NULL,
+                constraints JSONB,
+                boilerplate_cpp TEXT,
+                time_limit_ms INTEGER DEFAULT 1000,
+                memory_limit_mb INTEGER DEFAULT 256,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log('DSA bank problems table checked/created.');
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS dsa_bank_test_cases (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                problem_id UUID NOT NULL REFERENCES dsa_bank_problems(id) ON DELETE CASCADE,
+                test_order INTEGER NOT NULL,
+                input TEXT NOT NULL,
+                expected_output TEXT NOT NULL,
+                is_hidden BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(problem_id, test_order)
+            );
+        `);
+        console.log('DSA bank test cases table checked/created.');
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS dsa_round_configs (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -375,35 +407,6 @@ const createTables = async () => {
                 attempt_id UUID NOT NULL REFERENCES dsa_round_attempts(id) ON DELETE CASCADE,
                 event_type VARCHAR(32) NOT NULL,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-        `);
-
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS dsa_bank_problems (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                dataset_id VARCHAR(64) UNIQUE NOT NULL,
-                title VARCHAR(255) NOT NULL,
-                difficulty VARCHAR(16) NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
-                problem_statement TEXT NOT NULL,
-                constraints JSONB,
-                boilerplate_cpp TEXT,
-                time_limit_ms INTEGER DEFAULT 1000,
-                memory_limit_mb INTEGER DEFAULT 256,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-        `);
-
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS dsa_bank_test_cases (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                problem_id UUID NOT NULL REFERENCES dsa_bank_problems(id) ON DELETE CASCADE,
-                test_order INTEGER NOT NULL,
-                input TEXT NOT NULL,
-                expected_output TEXT NOT NULL,
-                is_hidden BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(problem_id, test_order)
             );
         `);
 

@@ -198,7 +198,7 @@ export const updateJob = async (jobId, jobData) => {
 
 export const getJobById = async (jobId) => {
     const result = await pool.query(
-        `SELECT j.*, o.name as organization_name, o.logo_url as organization_logo
+        `SELECT j.*, o.name as organization_name
      FROM jobs j
      LEFT JOIN organizations o ON j.organization_id = o.id
      WHERE j.id = $1`,
@@ -209,7 +209,7 @@ export const getJobById = async (jobId) => {
 
 export const getJobsByRecruiter = async (recruiterId) => {
     const result = await pool.query(
-        `SELECT j.*, o.name as organization_name, o.logo_url as organization_logo
+        `SELECT j.*, o.name as organization_name
      FROM jobs j
      LEFT JOIN organizations o ON j.organization_id = o.id
      WHERE j.recruiter_id = $1 
@@ -221,7 +221,7 @@ export const getJobsByRecruiter = async (recruiterId) => {
 
 export const getPublishedJobs = async () => {
     const result = await pool.query(
-        `SELECT j.*, o.name as organization_name, o.logo_url as organization_logo
+        `SELECT j.*, o.name as organization_name
      FROM jobs j
      LEFT JOIN organizations o ON j.organization_id = o.id
      WHERE j.status = 'PUBLISHED' 
@@ -233,7 +233,7 @@ export const getPublishedJobs = async () => {
 
 export const searchJobs = async (searchQuery) => {
     const result = await pool.query(
-        `SELECT j.*, o.name as organization_name, o.logo_url as organization_logo
+        `SELECT j.*, o.name as organization_name
      FROM jobs j
      LEFT JOIN organizations o ON j.organization_id = o.id
      WHERE j.status = 'PUBLISHED' 

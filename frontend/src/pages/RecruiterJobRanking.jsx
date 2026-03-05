@@ -78,16 +78,16 @@ const RecruiterJobRanking = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-fade-in">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Recruiter Intelligence</p>
-          <h1 className="text-3xl font-bold text-white mt-2">Rank Candidates</h1>
-          <p className="text-slate-400 mt-2">Analyze applicants with AI scoring and explainable insights.</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Recruiter Intelligence</p>
+          <h1 className="text-3xl font-bold gradient-text font-heading mt-2">Rank Candidates</h1>
+          <p className="text-muted-foreground mt-2">Analyze applicants with AI scoring and explainable insights.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
           <select
-            className="bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            className="bg-input border border-border text-foreground rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-ring"
             value={selectedJob}
             onChange={(event) => setSelectedJob(event.target.value)}
             disabled={loadingJobs}
@@ -102,7 +102,7 @@ const RecruiterJobRanking = () => {
           <button
             onClick={handleRank}
             disabled={ranking || loadingJobs}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg transition disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl gradient-primary text-white font-semibold shadow-lg transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {ranking ? 'Ranking...' : 'Rank Candidates'}
           </button>
@@ -110,11 +110,11 @@ const RecruiterJobRanking = () => {
       </div>
 
       {rankingData?.ranked_candidates?.length > 0 && (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+        <div className="glass-card p-6">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-white">Select Top Candidates</h2>
-              <p className="text-sm text-slate-400 mt-1">This will shortlist Top-N and reject the rest.</p>
+              <h2 className="text-lg font-semibold text-foreground font-heading">Select Top Candidates</h2>
+              <p className="text-sm text-muted-foreground mt-1">This will shortlist Top-N and reject the rest.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
@@ -122,20 +122,20 @@ const RecruiterJobRanking = () => {
                 min={1}
                 value={topN}
                 onChange={(e) => setTopN(e.target.value)}
-                className="bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 w-full sm:w-32"
+                className="bg-input border border-border text-foreground rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-ring w-full sm:w-32"
                 placeholder="Top N"
               />
               <input
                 type="text"
                 value={nextRound}
                 onChange={(e) => setNextRound(e.target.value)}
-                className="bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 w-full sm:w-48"
+                className="bg-input border border-border text-foreground rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-ring w-full sm:w-48"
                 placeholder="NEXT_ROUND"
               />
               <button
                 onClick={handleSelectTop}
                 disabled={selectingTop}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg transition disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-success hover:bg-success/90 text-white font-semibold shadow-lg transition-opacity disabled:opacity-50"
               >
                 {selectingTop ? 'Selecting...' : 'Select Top-N'}
               </button>
@@ -145,7 +145,7 @@ const RecruiterJobRanking = () => {
       )}
 
       {rankingData?.ranked_candidates?.length === 0 && (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-slate-400">
+        <div className="glass-card p-6 text-muted-foreground">
           No candidates found for this job yet.
         </div>
       )}
