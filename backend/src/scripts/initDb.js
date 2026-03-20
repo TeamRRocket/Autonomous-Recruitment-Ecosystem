@@ -203,7 +203,10 @@ const createTables = async () => {
         await client.query(
             `ALTER TABLE applications ADD COLUMN IF NOT EXISTS stage VARCHAR(32) NOT NULL DEFAULT 'applied' CHECK (stage IN ('applied','shortlisted','rejected'));`
         );
-        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS next_round VARCHAR(16) CHECK (next_round IN ('APTITUDE','DSA'));`);
+        // Drop old constraint if exists and add new one with TECHNICAL and INTERVIEW support
+        await client.query(`ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_next_round_check;`);
+        await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS next_round VARCHAR(16);`);
+        await client.query(`ALTER TABLE applications ADD CONSTRAINT applications_next_round_check CHECK (next_round IN ('APTITUDE','DSA','TECHNICAL','INTERVIEW'));`);
         await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_score INTEGER;`);
         await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS aptitude_score INTEGER;`);
         await client.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS dsa_score INTEGER;`);

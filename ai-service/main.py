@@ -42,6 +42,14 @@ except Exception as exc:
     # Keep existing APIs running even if resume module dependencies are missing.
     print(f"Resume router failed to load: {exc}")
 
+# Import technical interview module
+try:
+    from ai.technical.routes import router as technical_router
+    app.include_router(technical_router, prefix="/ai/technical", tags=["technical"])
+    print("✓ Technical interview module loaded successfully")
+except Exception as exc:
+    print(f"Technical router failed to load: {exc}")
+
 # Import proctoring module
 try:
     from ai.proctoring.models import (

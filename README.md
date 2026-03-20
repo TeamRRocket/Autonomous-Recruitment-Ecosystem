@@ -153,7 +153,8 @@ node src/scripts/seedDsaDataset.js
 
 ### For Recruiters
 - **AI-Powered Job Matching**: Intelligent candidate-job matching using hybrid ML algorithms
-- **Comprehensive Assessment**: Multi-round evaluation (aptitude, coding, DSA)
+- **Comprehensive Assessment**: Multi-round evaluation (aptitude, coding, DSA, technical interviews)
+- **Technical Interview AI**: Voice & text-based technical interviews with AI evaluation
 - **Real-time Proctoring**: AI-based behavioral monitoring during assessments
 - **Resume Intelligence**: Automated resume parsing and scoring
 - **Application Management**: Track and manage candidate applications
@@ -161,6 +162,7 @@ node src/scripts/seedDsaDataset.js
 ### For Candidates
 - **Smart Job Recommendations**: Personalized job suggestions based on skills and experience
 - **Interactive Assessments**: Engaging aptitude tests and coding challenges
+- **AI Technical Interviews**: Voice-enabled technical interviews with instant feedback
 - **Real-time Feedback**: Instant scoring and performance insights
 - **Profile Management**: Comprehensive candidate profile system
 
@@ -168,6 +170,7 @@ node src/scripts/seedDsaDataset.js
 - **Skill Matching**: Advanced skill normalization and semantic matching
 - **Resume Parsing**: Extract structured data from PDF/DOCX resumes
 - **Scoring Algorithms**: Multi-dimensional candidate evaluation
+- **Technical Interview Evaluation**: LLM-based answer assessment (correctness, depth, clarity)
 - **Proctoring AI**: Face detection, phone detection, behavior analysis
 - **LLM Integration**: Claude 3.5 Sonnet for semantic analysis
 
@@ -226,9 +229,31 @@ node src/scripts/seedDsaDataset.js
 - Health Check: `GET /health`
 - Job Matching: `POST /match-jobs`
 - Resume Scoring: `POST /ai/resume/score`
+- Technical Interview: `POST /ai/technical/evaluate`
 - Proctoring: 
   - Frame Processing: `POST /ai/proctoring/process-frame`
   - Risk Evaluation: `POST /ai/proctoring/evaluate-risk`
+
+### New: Technical Interview Module 🎙️
+AI-powered voice & text technical interviews with real-time evaluation.
+
+**Quick Setup:**
+```bash
+./setup-technical-interview.sh
+```
+
+**Features:**
+- 🎤 Browser-based speech recognition (Speech-to-Text)
+- 🔊 Text-to-Speech for AI interviewer
+- 🤖 LLM-based answer evaluation
+- 📊 Multi-dimensional scoring (correctness, depth, clarity)
+- ⏱️ Timed sessions with auto-submit
+- 🗂️ 25+ pre-loaded technical questions
+
+**Documentation:**
+- Full Guide: [docs/technical-interview.md](docs/technical-interview.md)
+- Quick Start: [QUICKSTART_TECHNICAL_INTERVIEW.md](QUICKSTART_TECHNICAL_INTERVIEW.md)
+- Summary: [TECHNICAL_INTERVIEW_SUMMARY.md](TECHNICAL_INTERVIEW_SUMMARY.md)
 
 ## 🔒 Security Features
 - JWT-based authentication

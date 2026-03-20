@@ -49,6 +49,7 @@ export const processApplicationResume = async ({ applicationId }) => {
 
   const fileBytes = await loadResumeFile(application.resume_file_path);
   if (!fileBytes) {
+    console.warn(`[Resume] No resume file found for application ${applicationId}: ${application.resume_file_path}`);
     await pool.query(
       `UPDATE applications
        SET resume_score = NULL,
@@ -69,7 +70,9 @@ export const processApplicationResume = async ({ applicationId }) => {
     resume_filename: application.resume_file_path,
   };
 
+  console.log(`[Resume] Calling AI service for application ${applicationId}...`);
   const aiResponse = await scoreResume(aiPayload);
+  console.log(`[Resume] ✓ AI service responded for application ${applicationId}`);
   _validateScorePayload(aiResponse);
 
   const scores = aiResponse.matching_scores || {};

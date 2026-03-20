@@ -6,7 +6,7 @@ export const selectTopCandidates = async ({ jobId, recruiterUserId, topN, nextRo
   if (!jobId) throw new AppError('jobId is required', 400);
   if (!recruiterUserId) throw new AppError('recruiterUserId is required', 400);
   if (!topN || Number.isNaN(Number(topN)) || Number(topN) <= 0) throw new AppError('top_n must be a positive number', 400);
-  if (!nextRound || !['APTITUDE', 'DSA'].includes(nextRound)) throw new AppError('next_round must be APTITUDE or DSA', 400);
+  if (!nextRound || !['APTITUDE', 'DSA', 'TECHNICAL', 'INTERVIEW'].includes(nextRound)) throw new AppError('next_round must be APTITUDE, DSA, TECHNICAL, or INTERVIEW', 400);
 
   const lockFrom = schedule?.lock_from ? new Date(schedule.lock_from) : null;
   if (lockFrom && Number.isNaN(lockFrom.getTime())) {

@@ -126,14 +126,19 @@ const RecruiterScores = () => {
           if (first.round_type === 'CODING') {
             return /dsa/i.test(first.round_name) ? 'DSA' : 'CODING';
           }
+          if (first.round_type === 'INTERVIEW') {
+            return /technical/i.test(first.round_name) ? 'TECHNICAL' : 'INTERVIEW';
+          }
           return first.round_type;
         })();
         setFirstRound(firstLabel);
 
-        // Backend selection + applications.next_round only supports APTITUDE/DSA
+        // Backend selection + applications.next_round supports APTITUDE/DSA/TECHNICAL/INTERVIEW
         let next = '';
         if (normalized.some((r) => r.round_type === 'MCQ')) next = 'APTITUDE';
         else if (normalized.some((r) => r.round_type === 'CODING')) next = 'DSA';
+        else if (normalized.some((r) => r.round_type === 'INTERVIEW' && /technical/i.test(r.round_name))) next = 'TECHNICAL';
+        else if (normalized.some((r) => r.round_type === 'INTERVIEW')) next = 'INTERVIEW';
         setSelectableNextRound(next);
       } catch {
         setFirstRound('');
@@ -267,7 +272,7 @@ const RecruiterScores = () => {
       return;
     }
     if (!selectableNextRound) {
-      toast.error('This job must include APTITUDE or DSA rounds to proceed');
+      toast.error('This job must include at least one round (APTITUDE, DSA, or TECHNICAL) to proceed');
       return;
     }
     if (!topN || Number.isNaN(Number(topN)) || Number(topN) <= 0) {
@@ -739,7 +744,7 @@ const RecruiterScores = () => {
                   {loadingFirstRound ? 'Loading...' : (firstRound || '--')}
                 </div>
                 {!loadingFirstRound && !selectableNextRound && (
-                  <p className="text-[11px] text-muted-foreground mt-2">Add an APTITUDE or DSA round in this job to enable selection emails.</p>
+                  <p className="text-[11px] text-muted-foreground mt-2">Add an APTITUDE, DSA, or TECHNICAL round in this job to enable selection emails.</p>
                 )}
               </div>
 

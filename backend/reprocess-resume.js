@@ -1,6 +1,6 @@
 import { processApplicationResume } from './src/modules/resume/resumeProcessing.service.js';
 
-const applicationId = '1a0043c9-eb02-4f33-b805-8c4631d7afd1';
+const applicationId = '56b87e8e-06e9-4e96-a8c9-505ad7422685';
 
 console.log('Reprocessing application:', applicationId);
 

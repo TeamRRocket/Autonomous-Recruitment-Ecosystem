@@ -36,6 +36,11 @@ const CandidateApplications = () => {
             if (st === 'submitted' || st === 'expired') return false;
         }
 
+        if (next === 'TECHNICAL' || next === 'INTERVIEW') {
+            const st = (app?.technical_attempt_status || '').toString().toUpperCase();
+            if (st === 'SUBMITTED' || st === 'EXPIRED') return false;
+        }
+
         const fromRaw = app?.selection_lock_from;
         const untilRaw = app?.selection_lock_until;
         if (!fromRaw || !untilRaw) return true;
@@ -101,6 +106,11 @@ const CandidateApplications = () => {
             }
 
             navigate(`/dsa/round/${app.job_id}`);
+            return;
+        }
+
+        if (next === 'TECHNICAL' || next === 'INTERVIEW') {
+            navigate(`/technical/interview/${app.job_id}`);
             return;
         }
 
@@ -255,6 +265,11 @@ const CandidateApplications = () => {
                                         </div>
                                     )}
                                     {!canStartRounds(app) && (app?.stage || '').toString().toLowerCase() === 'shortlisted' && ['DSA', 'CODING'].includes((app?.next_round || '').toString().toUpperCase()) && ['submitted', 'expired'].includes((app?.dsa_attempt_status || '').toString().toLowerCase()) && (
+                                        <div className="inline-flex items-center px-4 py-2 bg-slate-800/60 text-slate-200 rounded-xl text-sm font-semibold border border-slate-700">
+                                            Already attempted
+                                        </div>
+                                    )}
+                                    {!canStartRounds(app) && (app?.stage || '').toString().toLowerCase() === 'shortlisted' && ['TECHNICAL', 'INTERVIEW'].includes((app?.next_round || '').toString().toUpperCase()) && ['SUBMITTED', 'EXPIRED'].includes((app?.technical_attempt_status || '').toString().toUpperCase()) && (
                                         <div className="inline-flex items-center px-4 py-2 bg-slate-800/60 text-slate-200 rounded-xl text-sm font-semibold border border-slate-700">
                                             Already attempted
                                         </div>

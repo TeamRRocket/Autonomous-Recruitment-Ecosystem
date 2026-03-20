@@ -33,12 +33,22 @@ def _infer_years_from_text(raw_text: str) -> float:
     text = (raw_text or "").lower()
     if not text:
         return 0.0
-    match = re.search(r"(\d{1,2})\s*\+?\s*(years|yrs)\s+of\s+experience", text)
-    if match:
-        try:
-            return float(match.group(1))
-        except ValueError:
-            return 0.0
+    
+    # Try multiple patterns for experience
+    patterns = [
+        r"(\d{1,2})\s*\+?\s*(years|yrs)(\s*of)?\s*experience",
+        r"experience\s*:\s*(\d{1,2})\s*\+?\s*(years|yrs)",
+        r"(\d{1,2})\s*\+?\s*(years|yrs)" 
+    ]
+    
+    for pat in patterns:
+        match = re.search(pat, text)
+        if match:
+            try:
+                return float(match.group(1))
+            except ValueError:
+                continue
+                
     return 0.0
 
 
@@ -77,7 +87,25 @@ def score_experience(resume: Dict, job_title: str) -> float:
 def score_education(resume: Dict, required_degree: Optional[str] = None) -> float:
     education = resume.get("education", [])
     if not education:
+        # Fallback to text search if no structured education
+        text = str(resume.get("raw_text") or "").lower()
+        if not text:
+            return 0.0
+        
+        # Check required degree if specified
+        if required_degree:
+            req = required_degree.lower()
+            if req in text:
+                return 80.0 # High confidence if exact match found in text
+        
+        # Check for common degrees
+        common_degrees = ["bachelor", "master", "phd", "doctorate", "b.sc", "m.sc", "b.tech", "m.tech", "mba", "degree", "diploma", "university", "college"]
+        for deg in common_degrees:
+            if deg in text:
+                return 60.0 # Some degree found
+                
         return 0.0
+
     if not required_degree:
         return 60.0
     required_degree = required_degree.lower()

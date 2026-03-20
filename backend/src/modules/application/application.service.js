@@ -44,7 +44,16 @@ class ApplicationService {
             status: 'PENDING'
         });
 
-        await processApplicationResume({ applicationId: application.id });
+        // Process resume with AI scoring (non-blocking error handling)
+        try {
+            console.log(`[Resume Processing] Starting AI scoring for application ${application.id}`);
+            await processApplicationResume({ applicationId: application.id });
+            console.log(`[Resume Processing] ✓ AI scoring completed for application ${application.id}`);
+        } catch (aiError) {
+            console.error(`[Resume Processing] ✗ AI scoring failed for application ${application.id}:`, aiError.message);
+            // Don't fail the entire application creation if AI scoring fails
+            // The resume can be re-processed later
+        }
 
         return await applicationRepository.findById(application.id);
     }

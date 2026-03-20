@@ -43,6 +43,7 @@ import codingRoutes from './modules/coding/coding.routes.js';
 import dsaRoutes from './modules/dsa/dsa.routes.js';
 import aptitudeRoutes from './modules/aptitude/aptitude.routes.js';
 import proctoringRoutes from './modules/proctoring/proctoring.routes.js';
+import technicalRoutes from './modules/technical/technical.routes.js';
 import resumeRoutes from './routes/resume.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import errorHandler from './middleware/errorHandler.js';
@@ -61,6 +62,7 @@ app.use('/api/coding', codingRoutes);
 app.use('/api/dsa', dsaRoutes);
 app.use('/api/aptitude', aptitudeRoutes);
 app.use('/api/proctoring', proctoringRoutes);
+app.use('/api/technical', technicalRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/recruiter', aiRoutes);
 

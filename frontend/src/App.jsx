@@ -22,6 +22,7 @@ import Recommendations from './pages/Recommendations';
 import CandidateCodingRound from './pages/coding/CandidateCodingRound';
 import CandidateAptitudeRound from './pages/aptitude/CandidateAptitudeRound';
 import CandidateDsaRound from './pages/coding/CandidateDsaRound';
+import TechnicalInterview from './pages/technical/TechnicalInterview';
 import RecruiterScores from './pages/recruiter/RecruiterScores';
 import { useLocation } from 'react-router-dom';
 
@@ -102,7 +103,15 @@ function App() {
                 </RequireProfile>
               </ProtectedRoute>
             } />
+<Route path="/technical/interview/:jobId" element={
+              <ProtectedRoute>
+                <RequireProfile>
+                  <TechnicalInterview />
+                </RequireProfile>
+              </ProtectedRoute>
+            } />
 
+            
             {/* Main Application Routes Wrapped in DashboardLayout */}
             <Route element={
               <ProtectedRoute>
