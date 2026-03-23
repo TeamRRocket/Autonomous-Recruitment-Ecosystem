@@ -13,7 +13,7 @@
  * 7. Camera turns off only after exam completion
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { startAptitudeRound, submitAptitudeRound } from '../../services/aptitudeService';
@@ -44,10 +44,12 @@ const CandidateAptitudeRound = () => {
     const [redirected, setRedirected] = useState(false);
 
     // NEW: Proctoring state
-    const [showConsent, setShowConsent] = useState(true);
-    const [consentGiven, setConsentGiven] = useState(false);
+    const alreadyConsented = sessionStorage.getItem('proctoring_consent') === 'true';
+    const [showConsent, setShowConsent] = useState(!alreadyConsented);
+    const [consentGiven, setConsentGiven] = useState(alreadyConsented);
     const [proctoringSessionId, setProctoringSessionId] = useState(null);
     const [examStarted, setExamStarted] = useState(false);
+    const tabAutoSubmitDoneRef = useRef(false);
 
     // NEW: Proctoring hook
     const {
@@ -78,9 +80,6 @@ const CandidateAptitudeRound = () => {
         setConsentGiven(true);
         // Save consent so DSA round can skip the consent modal
         sessionStorage.setItem('proctoring_consent', 'true');
-
-        // Start the exam round
-        await startExamRound();
     };
 
     // NEW: Handle consent decline
@@ -131,6 +130,13 @@ const CandidateAptitudeRound = () => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (!consentGiven) return;
+        if (attemptId) return;
+        startExamRound();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [consentGiven, attemptId]);
 
     // Redirect after exam completion
     useEffect(() => {
@@ -247,9 +253,37 @@ const CandidateAptitudeRound = () => {
         auto();
     }, [attemptId, endsAt, result, nowTick, autoSubmitted, selectedByQuestion]);
 
-    // Auto-submit on tab switch or blur (REMOVED - proctoring handles this now)
-    // The proctoring hook already detects these events and logs them
-    // We don't want to auto-submit anymore, just record the violation
+    // Auto-submit immediately if user leaves exam tab/window.
+    useEffect(() => {
+        if (!attemptId || result || autoSubmitted) return;
+        const trigger = async () => {
+            if (tabAutoSubmitDoneRef.current) return;
+            tabAutoSubmitDoneRef.current = true;
+            setAutoSubmitted(true);
+            try {
+                setSubmitting(true);
+                const answers = Object.entries(selectedByQuestion).map(([questionId, selected]) => ({ questionId, selected }));
+                const res = await submitAptitudeRound({ attemptId, answers });
+                setResult(res.data);
+                toast.error('Tab switched - aptitude round auto-submitted');
+            } catch (err) {
+                toast.error(err.response?.data?.message || 'Auto-submit failed');
+            } finally {
+                setSubmitting(false);
+            }
+        };
+
+        const onVisibility = () => {
+            if (document.visibilityState === 'hidden') trigger();
+        };
+        const onBlur = () => trigger();
+        document.addEventListener('visibilitychange', onVisibility);
+        window.addEventListener('blur', onBlur);
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibility);
+            window.removeEventListener('blur', onBlur);
+        };
+    }, [attemptId, result, autoSubmitted, selectedByQuestion]);
 
     const onSelect = (questionId, letter) => {
         setSelectedByQuestion((prev) => ({ ...prev, [questionId]: letter }));
@@ -328,6 +362,10 @@ const CandidateAptitudeRound = () => {
         <div className="min-h-screen bg-slate-950 text-slate-100">
             {/* NEW: Recording indicator */}
             {isProctoring && <RecordingIndicator />}
+            <div className="fixed right-4 top-4 z-40 rounded-xl border border-slate-700 bg-slate-900/90 px-4 py-2 text-right shadow-lg backdrop-blur">
+                <p className="text-[10px] uppercase tracking-widest text-slate-400">Time Left</p>
+                <p className={`text-lg font-semibold ${ended ? 'text-red-400' : 'text-emerald-400'}`}>{timeLeftLabel}</p>
+            </div>
 
             <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
                 <div className="flex items-start justify-between gap-4">
@@ -343,10 +381,7 @@ const CandidateAptitudeRound = () => {
                         )}
                     </div>
 
-                    <div className="text-right">
-                        <p className="text-xs text-slate-500 uppercase tracking-widest">Time Left</p>
-                        <p className={`text-xl font-semibold ${ended ? 'text-red-400' : 'text-emerald-400'}`}>{timeLeftLabel}</p>
-                    </div>
+                    <div />
                 </div>
 
                 {result && (

@@ -2,6 +2,10 @@ import React from 'react';
 import RoundConfigCard from './RoundConfigCard';
 import toast from 'react-hot-toast';
 
+const isTechnicalRound = (round) =>
+    String(round?.type || '').toUpperCase() === 'INTERVIEW' &&
+    /technical/i.test(String(round?.round_name || round?.name || ''));
+
 const Step3ConfigureRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }) => {
     const handleUpdateRound = (roundId, updates) => {
         setSelectedRounds(prev => prev.map(r =>
@@ -14,7 +18,7 @@ const Step3ConfigureRounds = ({ selectedRounds, setSelectedRounds, onNext, onBac
             const duration = parseInt(round.duration_minutes);
             const hasBasic = duration > 0 && round.difficulty_level;
 
-            if (round.type === 'MCQ' || round.type === 'CODING') {
+            if (round.type === 'MCQ' || round.type === 'CODING' || isTechnicalRound(round)) {
                 const questions = parseInt(round.num_questions);
                 return hasBasic && questions > 0;
             }

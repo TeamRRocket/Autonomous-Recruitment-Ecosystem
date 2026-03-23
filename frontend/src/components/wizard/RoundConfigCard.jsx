@@ -1,6 +1,10 @@
 import React from 'react';
 import InputGroup from '../ui/InputGroup';
 
+const isTechnicalRound = (round) =>
+    String(round?.type || '').toUpperCase() === 'INTERVIEW' &&
+    /technical/i.test(String(round?.round_name || round?.name || ''));
+
 const RoundConfigCard = ({ round, index, onUpdate }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -39,9 +43,9 @@ const RoundConfigCard = ({ round, index, onUpdate }) => {
                     placeholder="e.g. 60"
                 />
 
-                {(round.type === 'MCQ' || round.type === 'CODING') && (
+                {(round.type === 'MCQ' || round.type === 'CODING' || isTechnicalRound(round)) && (
                     <InputGroup
-                        label="No. of Questions"
+                        label={isTechnicalRound(round) ? 'No. of Questions to Ask' : 'No. of Questions'}
                         name="num_questions"
                         type="number"
                         required

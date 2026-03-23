@@ -11,6 +11,10 @@ const AVAILABLE_ROUNDS = [
     { id: 'hr', name: 'HR / Behavioral Round', type: 'INTERVIEW' }
 ];
 
+const isTechnicalRound = (round) =>
+    String(round?.type || '').toUpperCase() === 'INTERVIEW' &&
+    /technical/i.test(String(round?.name || ''));
+
 const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }) => {
     // selectedRounds is array of { id, name, type, order }
 
@@ -25,7 +29,7 @@ const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }
                 duration_minutes: 60,
                 difficulty_level: 'MEDIUM',
                 passing_score: 60,
-                num_questions: (round.type === 'MCQ' || round.type === 'CODING') ? 10 : null
+                num_questions: (round.type === 'MCQ' || round.type === 'CODING' || isTechnicalRound(round)) ? 10 : null
             }]);
         }
     };

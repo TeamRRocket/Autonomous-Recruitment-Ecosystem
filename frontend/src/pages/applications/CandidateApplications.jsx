@@ -110,6 +110,13 @@ const CandidateApplications = () => {
         }
 
         if (next === 'TECHNICAL' || next === 'INTERVIEW') {
+            try {
+                if (document?.documentElement?.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                }
+            } catch {
+                // ignore
+            }
             navigate(`/technical/interview/${app.job_id}`);
             return;
         }

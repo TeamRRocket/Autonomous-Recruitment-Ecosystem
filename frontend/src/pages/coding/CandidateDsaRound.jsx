@@ -57,6 +57,7 @@ const CandidateDsaRound = () => {
 
   const [autoSubmitted, setAutoSubmitted] = useState(false);
   const [redirected, setRedirected] = useState(false);
+  const [forceClosed, setForceClosed] = useState(false);
 
   const [codeByProblem, setCodeByProblem] = useState({});
 
@@ -66,6 +67,7 @@ const CandidateDsaRound = () => {
   const [consentGiven, setConsentGiven] = useState(true); // Always allow exam to start
   const [proctoringSessionId, setProctoringSessionId] = useState(null);
   const [examStarted, setExamStarted] = useState(false);
+  const [fullscreenLocked, setFullscreenLocked] = useState(true);
 
   // Proctoring hook
   const {
@@ -75,10 +77,11 @@ const CandidateDsaRound = () => {
     startProctoring,
     stopProctoring,
     sendBrowserEvent
-  } = useProctoring(proctoringSessionId, examStarted && !finalResult);
+  } = useProctoring(proctoringSessionId, examStarted && !finalResult && !fullscreenLocked);
 
   const saveTimerRef = useRef(null);
   const lastSavedRef = useRef({});
+  const hadFullscreenRef = useRef(false);
   /** Flushed to server on each problem submit (DSA anti-cheat table) */
   const antiCheatRef = useRef([]);
   const codeByProblemRef = useRef(codeByProblem);
@@ -92,7 +95,7 @@ const CandidateDsaRound = () => {
   const submittedSet = useMemo(() => new Set((submittedProblemIds || []).map((v) => String(v))), [submittedProblemIds]);
   const activeProblemSubmitted = !!activeProblemId && submittedSet.has(String(activeProblemId));
 
-  const editorReadOnly = status === 'SUBMITTED' || status === 'EXPIRED' || activeProblemSubmitted;
+  const editorReadOnly = fullscreenLocked || status === 'SUBMITTED' || status === 'EXPIRED' || activeProblemSubmitted;
 
   const timeLeftMs = useMemo(() => {
     if (!endsAt) return 0;
@@ -108,11 +111,29 @@ const CandidateDsaRound = () => {
     return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
   }, [timeLeftMs]);
 
+  const enterFullscreenAndStart = useCallback(async () => {
+    try {
+      await document.documentElement.requestFullscreen();
+      setFullscreenLocked(false);
+    } catch {
+      toast.error('Fullscreen is required. Please allow fullscreen for this site.');
+    }
+  }, []);
+
   useEffect(() => {
     if (!endsAt) return;
     const t = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(t);
   }, [endsAt]);
+
+  useEffect(() => {
+    const onFs = () => {
+      if (!examStarted || finalResult) return;
+      setFullscreenLocked(!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, [examStarted, finalResult]);
 
   const currentCode = useMemo(() => {
     if (!activeProblemId) return DEFAULT_CPP_TEMPLATE;
@@ -201,17 +222,6 @@ const CandidateDsaRound = () => {
           console.error('Failed to end proctoring session:', err);
         }
       }
-      stopProctoring(); // Turn off camera - DSA is the last round
-      sessionStorage.removeItem('proctoring_consent'); // Clear consent for next exam
-
-      try {
-        if (document?.fullscreenElement && document?.exitFullscreen) {
-          document.exitFullscreen();
-        }
-      } catch {
-        // ignore
-      }
-
       const go = async () => {
         if (!jobId) {
           navigate('/applications', { replace: true });
@@ -223,6 +233,7 @@ const CandidateDsaRound = () => {
           const rounds = Array.isArray(r?.data) ? r.data : [];
           const next = getNextRoundAfter(rounds, 'DSA');
           if (next) {
+            // Keep consent for the next immediate round in this pipeline.
             navigate(getNavigatePathForRound(jobId, next), { replace: true });
             return;
           }
@@ -230,6 +241,15 @@ const CandidateDsaRound = () => {
           // ignore
         }
 
+        try {
+          if (document?.fullscreenElement && document?.exitFullscreen) {
+            document.exitFullscreen();
+          }
+        } catch {
+          // ignore
+        }
+        stopProctoring();
+        sessionStorage.removeItem('proctoring_consent');
         navigate('/applications', { replace: true });
       };
 
@@ -329,6 +349,7 @@ const CandidateDsaRound = () => {
       }
 
       setExamStarted(true);
+      setFullscreenLocked(!document.fullscreenElement);
     } catch (err) {
       console.error('Failed to start DSA round:', err);
       const errorMsg = err.response?.data?.message || 'Failed to start DSA round';
@@ -505,20 +526,57 @@ const CandidateDsaRound = () => {
     }
   }, [attemptId, jobId, problems, submittedProblemIds]);
 
-  /** Leaving the exam tab auto-submits once (policy: same idea as fullscreen exit on technical) */
+  /** Any security violation (tab/blur/fullscreen-exit) closes round once */
   const tabAutoSubmitDoneRef = useRef(false);
+  const closeRoundOnViolation = useCallback(async (reason = 'Security violation') => {
+    if (tabAutoSubmitDoneRef.current) return;
+    tabAutoSubmitDoneRef.current = true;
+    setForceClosed(true);
+    toast.error(`${reason}. DSA round is closing and submitting now.`);
+    try {
+      await submitAllRemaining();
+    } finally {
+      try {
+        if (proctoringSessionId) {
+          await proctoringService.endSession(proctoringSessionId);
+        }
+      } catch {
+        // ignore
+      }
+      stopProctoring();
+      sessionStorage.removeItem('proctoring_consent');
+      navigate('/applications', { replace: true });
+    }
+  }, [submitAllRemaining, proctoringSessionId, stopProctoring, navigate]);
+
   useEffect(() => {
     if (!examStarted || !attemptId || finalResult) return;
     const onVis = () => {
-      if (document.visibilityState === 'hidden' && !tabAutoSubmitDoneRef.current) {
-        tabAutoSubmitDoneRef.current = true;
-        toast.error('You left the exam tab — submitting your answers now.');
-        void submitAllRemaining();
+      if (document.visibilityState === 'hidden') {
+        void closeRoundOnViolation('Tab switched');
       }
     };
+    const onBlur = () => void closeRoundOnViolation('Window focus lost');
     document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
-  }, [examStarted, attemptId, finalResult, submitAllRemaining]);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [examStarted, attemptId, finalResult, closeRoundOnViolation]);
+
+  useEffect(() => {
+    if (!examStarted || !attemptId || finalResult) return;
+    const onFsViolation = () => {
+      const inFullscreen = !!document.fullscreenElement;
+      if (inFullscreen) hadFullscreenRef.current = true;
+      if (hadFullscreenRef.current && !inFullscreen) {
+        void closeRoundOnViolation('Fullscreen exited');
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsViolation);
+    return () => document.removeEventListener('fullscreenchange', onFsViolation);
+  }, [examStarted, attemptId, finalResult, closeRoundOnViolation]);
 
   /** Block copy/cut/paste in the round (stdin field may still paste — marked data-allow-paste) */
   useEffect(() => {
@@ -608,6 +666,10 @@ const CandidateDsaRound = () => {
     return <div className="p-8 text-slate-400">Loading DSA round...</div>;
   }
 
+  if (forceClosed) {
+    return <div className="p-8 text-slate-300">Closing DSA round due to tab switch...</div>;
+  }
+
   if (!problems.length && !loading) {
     return <div className="p-8 text-slate-400">DSA round not available.</div>;
   }
@@ -616,6 +678,27 @@ const CandidateDsaRound = () => {
     <div className="h-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* Recording Indicator */}
       {isProctoring && <RecordingIndicator />}
+      {fullscreenLocked && attemptId && !finalResult && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 px-4">
+          <div className="max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-8 text-center shadow-2xl">
+            <h2 className="mb-2 text-xl font-bold text-white">Fullscreen required</h2>
+            <p className="mb-6 text-sm text-slate-300">
+              Click below to enter fullscreen and continue your DSA round.
+            </p>
+            <button
+              type="button"
+              onClick={enterFullscreenAndStart}
+              className="w-full rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white hover:bg-indigo-500"
+            >
+              Enter fullscreen and continue
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="fixed right-4 top-4 z-40 rounded-xl border border-slate-700 bg-slate-900/90 px-4 py-2 text-right shadow-lg backdrop-blur">
+        <p className="text-[10px] uppercase tracking-widest text-slate-400">Time Left</p>
+        <p className={`text-lg font-semibold ${timeLeftMs > 0 ? 'text-amber-300' : 'text-red-400'}`}>{timeLeftLabel}</p>
+      </div>
 
       <div ref={splitContainerRef} className="w-full px-4 sm:px-6 lg:px-8 py-6 h-full">
         <div className="h-full min-h-0 flex flex-col lg:flex-row gap-6">

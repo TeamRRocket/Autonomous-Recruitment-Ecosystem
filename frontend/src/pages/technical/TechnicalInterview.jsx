@@ -11,7 +11,6 @@ import { getRounds } from '../../services/roundService';
 import { getNextRoundAfter, getNavigatePathForRound } from '../../utils/candidateRoundNavigation';
 import {
   CheckCircleIcon,
-  ClockIcon,
   ArrowRightIcon,
   ArrowLeftIcon,
   MicrophoneIcon,
@@ -62,6 +61,7 @@ const TechnicalInterview = () => {
   const [showFeedback, setShowFeedback] = useState({});
   const [error, setError] = useState(null);
   const [inFullscreen, setInFullscreen] = useState(false);
+  const [forceClosed, setForceClosed] = useState(false);
 
   const timerRef = useRef(null);
 
@@ -121,7 +121,9 @@ const TechnicalInterview = () => {
         setProctoringSessionId(null);
       }
       setExamStarted(true);
-      setFullscreenLocked(true);
+      const alreadyInFullscreen = !!document.fullscreenElement;
+      setInFullscreen(alreadyInFullscreen);
+      setFullscreenLocked(!alreadyInFullscreen);
     } catch (err) {
       console.error('Failed to load interview:', err);
       setError(err.response?.data?.message || 'Failed to load interview');
@@ -136,15 +138,9 @@ const TechnicalInterview = () => {
   }, [consentGiven, jobId, loadInterview]);
 
   const submitInterviewFinal = useCallback(
-    async (skipConfirm = false) => {
+    async () => {
       if (autoSubmittedRef.current) return;
       if (!interview) return;
-      if (!skipConfirm) {
-        const confirmed = window.confirm(
-          'Are you sure you want to submit your interview? You cannot make changes after submission.'
-        );
-        if (!confirmed) return;
-      }
 
       autoSubmittedRef.current = true;
       try {
@@ -158,13 +154,6 @@ const TechnicalInterview = () => {
           }
         }
         stopProctoring();
-        try {
-          if (document.fullscreenElement && document.exitFullscreen) {
-            await document.exitFullscreen();
-          }
-        } catch {
-          // ignore
-        }
         await technicalService.submit(interview.attemptId);
         toast.success('Interview submitted successfully!');
         try {
@@ -178,6 +167,14 @@ const TechnicalInterview = () => {
         } catch {
           // ignore
         }
+        try {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            await document.exitFullscreen();
+          }
+        } catch {
+          // ignore
+        }
+        sessionStorage.removeItem('proctoring_consent');
         navigate('/applications', { replace: true });
       } catch (err) {
         console.error('Failed to submit interview:', err);
@@ -210,7 +207,7 @@ const TechnicalInterview = () => {
       setTimeRemaining((prev) => {
         if (prev <= 0) return 0;
         if (prev === 1) {
-          submitInterviewFinal(true);
+          submitInterviewFinal();
           return 0;
         }
         return prev - 1;
@@ -238,7 +235,7 @@ const TechnicalInterview = () => {
           });
         }
         toast.error('Fullscreen exited — submitting your interview.');
-        submitInterviewFinal(true);
+        submitInterviewFinal();
       }
       setInFullscreen(fs);
     };
@@ -256,8 +253,9 @@ const TechnicalInterview = () => {
       if (proctoringSessionId) {
         sendBrowserEvent('TAB_SWITCH', { timestamp: new Date().toISOString() });
       }
+      setForceClosed(true);
       toast.error('You left the exam — submitting your interview.');
-      submitInterviewFinal(true);
+      submitInterviewFinal();
     };
 
     const onVisibility = () => {
@@ -428,7 +426,7 @@ const TechnicalInterview = () => {
     }
   };
 
-  const handleSubmitInterview = () => submitInterviewFinal(false);
+  const handleSubmitInterview = () => submitInterviewFinal();
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -469,6 +467,16 @@ const TechnicalInterview = () => {
     );
   }
 
+  if (forceClosed) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-slate-100">
+        <div className="max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-8 text-center">
+          <p className="text-base">Closing technical round due to tab switch...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!interview) {
     return null;
   }
@@ -478,8 +486,14 @@ const TechnicalInterview = () => {
   const feedback = showFeedback[currentQuestion?.id];
 
   return (
-    <div className="min-h-screen bg-slate-100 py-6 text-slate-900 antialiased sm:py-10">
+    <div className="min-h-screen bg-slate-950 py-6 text-slate-100 antialiased sm:py-10">
       {isProctoring && <RecordingIndicator />}
+      <div className="fixed right-4 top-4 z-40 rounded-xl border border-slate-700 bg-slate-900/90 px-4 py-2 text-right shadow-lg backdrop-blur">
+        <p className="text-[10px] uppercase tracking-widest text-slate-400">Time Left</p>
+        <p className={`text-lg font-semibold ${timeRemaining != null && timeRemaining < 300 ? 'text-red-400' : 'text-emerald-400'}`}>
+          {examActive && timeRemaining != null ? formatTime(timeRemaining) : '—'}
+        </p>
+      </div>
 
       {fullscreenLocked && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 px-4">
@@ -500,23 +514,13 @@ const TechnicalInterview = () => {
       )}
 
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
-        <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
+        <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-sm sm:p-8">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Technical round</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Technical interview</h1>
+              <p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">Technical round</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">Technical interview</h1>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div
-                className={`flex items-center gap-2 rounded-xl border px-4 py-2 font-mono text-lg font-semibold tabular-nums ${
-                  timeRemaining != null && timeRemaining < 300
-                    ? 'border-red-200 bg-red-50 text-red-800'
-                    : 'border-slate-200 bg-slate-50 text-slate-800'
-                }`}
-              >
-                <ClockIcon className="h-5 w-5 shrink-0 opacity-80" />
-                <span>{examActive && timeRemaining != null ? formatTime(timeRemaining) : '—'}</span>
-              </div>
               <button
                 type="button"
                 onClick={handleSubmitInterview}
@@ -529,13 +533,13 @@ const TechnicalInterview = () => {
           </div>
 
           <div className="mb-3">
-            <div className="mb-2 flex justify-between text-sm font-medium text-slate-600">
+            <div className="mb-2 flex justify-between text-sm font-medium text-slate-400">
               <span>
                 Question {currentQuestionIndex + 1} of {interview.questions.length}
               </span>
               <span>{answeredCount} answered</span>
             </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
               <div
                 className="h-full rounded-full bg-indigo-600 transition-all duration-300"
                 style={{ width: `${progress}%` }}
@@ -543,23 +547,23 @@ const TechnicalInterview = () => {
             </div>
           </div>
 
-          <p className="text-sm leading-relaxed text-slate-600">
-            Read each question carefully. Use <strong className="font-semibold text-slate-800">Speak answer</strong> to
+          <p className="text-sm leading-relaxed text-slate-300">
+            Read each question carefully. Use <strong className="font-semibold text-white">Speak answer</strong> to
             dictate (text appears live), or type your response in the box below.
           </p>
         </div>
 
-        <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
+        <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-sm sm:p-8">
           <div className="mb-6">
             {currentQuestion?.topic && (
-              <p className="mb-2 text-sm font-medium uppercase tracking-wide text-indigo-600">{currentQuestion.topic}</p>
+              <p className="mb-2 text-sm font-medium uppercase tracking-wide text-indigo-300">{currentQuestion.topic}</p>
             )}
-            <h2 className="text-lg font-semibold leading-relaxed text-slate-900 sm:text-xl">{currentQuestion?.question}</h2>
+            <h2 className="text-lg font-semibold leading-relaxed text-white sm:text-xl">{currentQuestion?.question}</h2>
           </div>
 
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <label htmlFor="technical-answer" className="text-base font-semibold text-slate-800">
+              <label htmlFor="technical-answer" className="text-base font-semibold text-slate-200">
                 Your answer
               </label>
               {isSpeechSupported && examActive && (
@@ -592,7 +596,7 @@ const TechnicalInterview = () => {
               value={currentAnswer}
               onChange={(e) => handleManualInput(e.target.value)}
               rows={10}
-              className="min-h-[220px] w-full resize-y rounded-xl border-2 border-slate-300 bg-white px-4 py-4 text-base leading-relaxed text-slate-900 shadow-inner placeholder:text-slate-500 caret-indigo-600 selection:bg-indigo-100 selection:text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600"
+              className="min-h-[220px] w-full resize-y rounded-xl border border-slate-700 bg-slate-950 px-4 py-4 text-base leading-relaxed text-slate-100 shadow-inner placeholder:text-slate-500 caret-indigo-400 selection:bg-indigo-200/30 selection:text-white focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
               placeholder={
                 isListening
                   ? 'Listening… speak clearly. You can edit this text anytime.'
@@ -604,7 +608,7 @@ const TechnicalInterview = () => {
             />
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-sm font-medium tabular-nums text-slate-600">
+              <span className="text-sm font-medium tabular-nums text-slate-400">
                 {currentAnswer.length} characters
               </span>
 
@@ -630,26 +634,26 @@ const TechnicalInterview = () => {
           </div>
 
           {feedback && (
-            <div className="mt-8 rounded-xl border border-emerald-200 bg-emerald-50/90 p-5 text-slate-900 shadow-sm">
-              <h3 className="mb-3 text-base font-bold text-emerald-900">Evaluation</h3>
+            <div className="mt-8 rounded-xl border border-emerald-700/40 bg-emerald-900/20 p-5 text-slate-100 shadow-sm">
+              <h3 className="mb-3 text-base font-bold text-emerald-300">Evaluation</h3>
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-lg bg-white/80 px-3 py-2">
-                  <span className="text-xs font-medium uppercase tracking-wide text-slate-600">Correctness</span>
-                  <p className="text-lg font-bold text-emerald-800">{feedback.correctness}/10</p>
+                <div className="rounded-lg bg-slate-950/60 px-3 py-2">
+                  <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Correctness</span>
+                  <p className="text-lg font-bold text-emerald-300">{feedback.correctness}/10</p>
                 </div>
-                <div className="rounded-lg bg-white/80 px-3 py-2">
-                  <span className="text-xs font-medium uppercase tracking-wide text-slate-600">Depth</span>
-                  <p className="text-lg font-bold text-emerald-800">{feedback.depth}/10</p>
+                <div className="rounded-lg bg-slate-950/60 px-3 py-2">
+                  <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Depth</span>
+                  <p className="text-lg font-bold text-emerald-300">{feedback.depth}/10</p>
                 </div>
-                <div className="rounded-lg bg-white/80 px-3 py-2">
-                  <span className="text-xs font-medium uppercase tracking-wide text-slate-600">Clarity</span>
-                  <p className="text-lg font-bold text-emerald-800">{feedback.clarity}/10</p>
+                <div className="rounded-lg bg-slate-950/60 px-3 py-2">
+                  <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Clarity</span>
+                  <p className="text-lg font-bold text-emerald-300">{feedback.clarity}/10</p>
                 </div>
               </div>
-              <p className="text-sm text-slate-800">
+              <p className="text-sm text-slate-200">
                 <span className="font-semibold">Overall score:</span> {feedback.score}/10
               </p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-800">
+              <p className="mt-2 text-sm leading-relaxed text-slate-200">
                 <span className="font-semibold">Feedback:</span> {feedback.feedback}
               </p>
             </div>
@@ -661,7 +665,7 @@ const TechnicalInterview = () => {
             type="button"
             onClick={handlePreviousQuestion}
             disabled={currentQuestionIndex === 0 || !examActive}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-6 py-3 text-sm font-semibold text-slate-200 shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
             <ArrowLeftIcon className="h-5 w-5" />
             Previous
@@ -671,15 +675,15 @@ const TechnicalInterview = () => {
             type="button"
             onClick={handleNextQuestion}
             disabled={currentQuestionIndex === interview.questions.length - 1 || !examActive}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-6 py-3 text-sm font-semibold text-slate-200 shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
             Next
             <ArrowRightIcon className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
-          <h3 className="mb-4 text-base font-bold text-slate-900">Question navigator</h3>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-sm sm:p-8">
+          <h3 className="mb-4 text-base font-bold text-white">Question navigator</h3>
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 sm:gap-3 md:grid-cols-6 lg:grid-cols-8">
             {interview.questions.map((q, idx) => (
               <button
@@ -695,8 +699,8 @@ const TechnicalInterview = () => {
                   idx === currentQuestionIndex
                     ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-300'
                     : answers[q.id]?.trim()
-                      ? 'border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
-                      : 'border border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100'
+                      ? 'border border-emerald-700/40 bg-emerald-900/20 text-emerald-300 hover:bg-emerald-900/30'
+                      : 'border border-slate-700 bg-slate-950/70 text-slate-200 hover:bg-slate-800'
                 } ${!examActive ? 'cursor-not-allowed opacity-50' : ''}`}
               >
                 Q{idx + 1}
