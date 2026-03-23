@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Editor from '@monaco-editor/react';
@@ -8,6 +8,7 @@ import useProctoring from '../../hooks/useProctoring';
 import ProctoringConsent from '../../components/proctoring/ProctoringConsent';
 import RecordingIndicator from '../../components/proctoring/RecordingIndicator';
 import proctoringService from '../../services/proctoringService';
+import { getNextRoundAfter, getNavigatePathForRound } from '../../utils/candidateRoundNavigation';
 
 const DEFAULT_CPP_TEMPLATE = `#include <bits/stdc++.h>
 using namespace std;
@@ -72,11 +73,16 @@ const CandidateDsaRound = () => {
     hasWebcamPermission,
     error: proctoringError,
     startProctoring,
-    stopProctoring
-  } = useProctoring(proctoringSessionId, examStarted);
+    stopProctoring,
+    sendBrowserEvent
+  } = useProctoring(proctoringSessionId, examStarted && !finalResult);
 
   const saveTimerRef = useRef(null);
   const lastSavedRef = useRef({});
+  /** Flushed to server on each problem submit (DSA anti-cheat table) */
+  const antiCheatRef = useRef([]);
+  const codeByProblemRef = useRef(codeByProblem);
+  codeByProblemRef.current = codeByProblem;
 
   const activeProblem = useMemo(
     () => problems.find((p) => p.id === activeProblemId) || null,
@@ -215,32 +221,9 @@ const CandidateDsaRound = () => {
         try {
           const r = await getRounds(jobId);
           const rounds = Array.isArray(r?.data) ? r.data : [];
-
-          const online = rounds
-            .map((x) => ({
-              round_type: String(x?.round_type || '').toUpperCase(),
-              round_order: Number(x?.round_order),
-            }))
-            .filter((x) => (x.round_type === 'MCQ' || x.round_type === 'CODING') && Number.isFinite(x.round_order))
-            .sort((a, b) => a.round_order - b.round_order);
-
-          const labelFor = (t) => (t === 'MCQ' ? 'APTITUDE' : t === 'CODING' ? 'DSA' : t);
-          const currentLabel = 'DSA';
-          const idx = online.findIndex((x) => labelFor(x.round_type) === currentLabel);
-          const next = idx >= 0 ? online[idx + 1] : null;
-
-          if (!next) {
-            navigate('/applications', { replace: true });
-            return;
-          }
-
-          const nextLabel = labelFor(next.round_type);
-          if (nextLabel === 'APTITUDE') {
-            navigate(`/aptitude/round/${jobId}`, { replace: true });
-            return;
-          }
-          if (nextLabel === 'DSA') {
-            navigate(`/dsa/round/${jobId}`, { replace: true });
+          const next = getNextRoundAfter(rounds, 'DSA');
+          if (next) {
+            navigate(getNavigatePathForRound(jobId, next), { replace: true });
             return;
           }
         } catch {
@@ -456,7 +439,8 @@ const CandidateDsaRound = () => {
 
     setSubmitting(true);
     try {
-      const res = await submitDsa({ job_id: jobId, attempt_id: attemptId, solutions, anti_cheat_events: [] });
+      const anti_cheat_events = antiCheatRef.current.splice(0);
+      const res = await submitDsa({ job_id: jobId, attempt_id: attemptId, solutions, anti_cheat_events });
 
       const nextStatus = res?.data?.status;
       const nextSubmitted = (res?.data?.submitted_problem_ids || []).map((v) => String(v));
@@ -488,20 +472,23 @@ const CandidateDsaRound = () => {
     }
   };
 
-  const submitAllRemaining = async () => {
+  const submitAllRemaining = useCallback(async () => {
     if (!attemptId) return;
 
-    const unsubmitted = problems.filter((p) => !submittedSet.has(String(p.id)));
+    const submitted = new Set((submittedProblemIds || []).map((v) => String(v)));
+    const unsubmitted = problems.filter((p) => !submitted.has(String(p.id)));
     if (unsubmitted.length === 0) return;
 
+    const code = codeByProblemRef.current;
     const solutions = unsubmitted.map((p) => ({
       problem_id: String(p.id),
-      source_code: codeByProblem[p.id] || p.boilerplate_cpp || DEFAULT_CPP_TEMPLATE,
+      source_code: code[p.id] || p.boilerplate_cpp || DEFAULT_CPP_TEMPLATE,
     }));
 
     setSubmitting(true);
     try {
-      const res = await submitDsa({ job_id: jobId, attempt_id: attemptId, solutions, anti_cheat_events: [] });
+      const anti_cheat_events = antiCheatRef.current.splice(0);
+      const res = await submitDsa({ job_id: jobId, attempt_id: attemptId, solutions, anti_cheat_events });
       const nextStatus = res?.data?.status;
       const nextSubmitted = (res?.data?.submitted_problem_ids || []).map((v) => String(v));
       setSubmittedProblemIds(nextSubmitted);
@@ -516,32 +503,82 @@ const CandidateDsaRound = () => {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [attemptId, jobId, problems, submittedProblemIds]);
 
+  /** Leaving the exam tab auto-submits once (policy: same idea as fullscreen exit on technical) */
+  const tabAutoSubmitDoneRef = useRef(false);
   useEffect(() => {
-    if (!attemptId) return;
-    if (finalResult) return;
-    if (autoSubmitted) return;
+    if (!examStarted || !attemptId || finalResult) return;
+    const onVis = () => {
+      if (document.visibilityState === 'hidden' && !tabAutoSubmitDoneRef.current) {
+        tabAutoSubmitDoneRef.current = true;
+        toast.error('You left the exam tab — submitting your answers now.');
+        void submitAllRemaining();
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [examStarted, attemptId, finalResult, submitAllRemaining]);
 
-    const submitOnce = async () => {
-      if (autoSubmitted) return;
-      setAutoSubmitted(true);
-      await submitAllRemaining();
+  /** Block copy/cut/paste in the round (stdin field may still paste — marked data-allow-paste) */
+  useEffect(() => {
+    if (!examStarted || finalResult) return;
+
+    const allowPasteTarget = (el) => el?.closest?.('[data-allow-paste="true"]');
+
+    const onClipboardBlock = (e) => {
+      if (allowPasteTarget(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      antiCheatRef.current.push({ event_type: 'CLIPBOARD_' + e.type.toUpperCase() });
+      sendBrowserEvent('COPY_PASTE_BLOCKED', { action: e.type, timestamp: new Date().toISOString() });
     };
 
-    const onVisibility = () => {
-      if (document.visibilityState !== 'visible') submitOnce();
+    const onKeyBlock = (e) => {
+      if (allowPasteTarget(e.target)) return;
+      if (e.ctrlKey || e.metaKey) {
+        const k = e.key?.toLowerCase?.();
+        if (k === 'c' || k === 'v' || k === 'x') {
+          e.preventDefault();
+          e.stopPropagation();
+          antiCheatRef.current.push({ event_type: 'KEYBOARD_' + k.toUpperCase() });
+        }
+      }
     };
-    const onBlur = () => submitOnce();
 
-    document.addEventListener('visibilitychange', onVisibility);
+    document.addEventListener('copy', onClipboardBlock, true);
+    document.addEventListener('cut', onClipboardBlock, true);
+    document.addEventListener('paste', onClipboardBlock, true);
+    window.addEventListener('keydown', onKeyBlock, true);
+
+    return () => {
+      document.removeEventListener('copy', onClipboardBlock, true);
+      document.removeEventListener('cut', onClipboardBlock, true);
+      document.removeEventListener('paste', onClipboardBlock, true);
+      window.removeEventListener('keydown', onKeyBlock, true);
+    };
+  }, [examStarted, finalResult, sendBrowserEvent]);
+
+  /** Persist tab/blur counts for DSA anti_cheat rows (useProctoring already sends proctoring HTTP events) */
+  useEffect(() => {
+    if (!examStarted || finalResult) return;
+
+    const onVis = () => {
+      if (document.visibilityState !== 'visible') {
+        antiCheatRef.current.push({ event_type: 'TAB_HIDDEN' });
+      }
+    };
+    const onBlur = () => {
+      antiCheatRef.current.push({ event_type: 'WINDOW_BLUR' });
+    };
+
+    document.addEventListener('visibilitychange', onVis);
     window.addEventListener('blur', onBlur);
     return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
+      document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('blur', onBlur);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attemptId, finalResult, autoSubmitted, problems, codeByProblem]);
+  }, [examStarted, finalResult]);
 
   useEffect(() => {
     if (!attemptId) return;
@@ -555,8 +592,7 @@ const CandidateDsaRound = () => {
 
     setAutoSubmitted(true);
     submitAllRemaining();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attemptId, endsAt, finalResult, autoSubmitted, nowTick]);
+  }, [attemptId, endsAt, finalResult, autoSubmitted, nowTick, submitAllRemaining]);
 
   // Show consent modal FIRST (before any loading checks)
   if (showConsent) {
@@ -730,6 +766,11 @@ const CandidateDsaRound = () => {
                     theme="vs-dark"
                     value={currentCode}
                     onChange={(value) => setCurrentCode(value ?? '')}
+                    onMount={(editor, monaco) => {
+                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {});
+                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {});
+                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {});
+                    }}
                     options={{
                       readOnly: editorReadOnly,
                       minimap: { enabled: false },
@@ -737,6 +778,7 @@ const CandidateDsaRound = () => {
                       wordWrap: 'on',
                       scrollBeyondLastLine: false,
                       automaticLayout: true,
+                      contextmenu: false,
                     }}
                   />
                 </div>
@@ -744,6 +786,7 @@ const CandidateDsaRound = () => {
                 <div className="mt-3">
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Custom Input (stdin)</h3>
                   <textarea
+                    data-allow-paste="true"
                     value={stdin}
                     onChange={(e) => setStdin(e.target.value)}
                     className="w-full h-24 rounded-xl bg-slate-950/50 border border-slate-800 p-3 text-xs font-mono text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"

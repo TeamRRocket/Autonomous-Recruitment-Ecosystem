@@ -256,9 +256,9 @@ export const useProctoring = (sessionId, isActive = false) => {
         console.log('✓ Proctoring stopped');
     }, []);
 
-    // Setup browser event listeners
+    // Browser events: run while the exam step is active (camera optional — events still reach proctoring API when sessionId exists)
     useEffect(() => {
-        if (!isActive || !isProctoring) return;
+        if (!isActive) return;
 
         const handleVisibilityChange = () => {
             if (document.hidden) {
@@ -270,14 +270,14 @@ export const useProctoring = (sessionId, isActive = false) => {
             sendBrowserEvent('WINDOW_BLUR', { timestamp: new Date().toISOString() });
         };
 
-        const handleCopy = (e) => {
+        const handleCopy = () => {
             sendBrowserEvent('COPY_PASTE', {
                 action: 'copy',
                 timestamp: new Date().toISOString()
             });
         };
 
-        const handlePaste = (e) => {
+        const handlePaste = () => {
             sendBrowserEvent('COPY_PASTE', {
                 action: 'paste',
                 timestamp: new Date().toISOString()
@@ -295,7 +295,7 @@ export const useProctoring = (sessionId, isActive = false) => {
             document.removeEventListener('copy', handleCopy);
             document.removeEventListener('paste', handlePaste);
         };
-    }, [isActive, isProctoring, sendBrowserEvent]);
+    }, [isActive, sendBrowserEvent]);
 
     // Cleanup on unmount
     useEffect(() => {

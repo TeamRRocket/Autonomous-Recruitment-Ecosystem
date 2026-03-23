@@ -18,6 +18,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { startAptitudeRound, submitAptitudeRound } from '../../services/aptitudeService';
 import { getRounds } from '../../services/roundService';
+import { getNextRoundAfter, getNavigatePathForRound } from '../../utils/candidateRoundNavigation';
 import useProctoring from '../../hooks/useProctoring';
 import ProctoringConsent from '../../components/proctoring/ProctoringConsent';
 import RecordingIndicator from '../../components/proctoring/RecordingIndicator';
@@ -159,11 +160,10 @@ const CandidateAptitudeRound = () => {
             try {
                 const r = await getRounds(jobId);
                 const rounds = Array.isArray(r?.data) ? r.data : [];
-                const hasCoding = rounds.some((x) => String(x?.round_type || '').toUpperCase() === 'CODING');
-                if (hasCoding) {
-                    // DON'T stop camera - DSA round will take over
+                const next = getNextRoundAfter(rounds, 'APTITUDE');
+                if (next) {
                     stopProctoring();
-                    navigate(`/dsa/round/${jobId}`, { replace: true });
+                    navigate(getNavigatePathForRound(jobId, next), { replace: true });
                     return;
                 }
             } catch {

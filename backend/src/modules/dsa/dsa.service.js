@@ -82,6 +82,9 @@ const redisKeys = (attemptId) => ({
   drafts: `dsa:round:${attemptId}:drafts`,
 });
 
+/** Prevents concurrent duplicate auto-submits when many /status polls hit expiry at once */
+const autoSubmitInFlight = new Map();
+
 const getSubmittedProblemIds = async (attemptId, client = pool) => {
   const res = await client.query(
     `SELECT DISTINCT problem_id
@@ -256,20 +259,36 @@ const autoSubmitIfExpired = async (userId, candidateId, attempt) => {
   const status = await redis.get(keys.status);
   if (status) return null;
 
-  const problems = attempt.problem_ids ? await getProblemsByIds(attempt.problem_ids) : await getConfigProblems(attempt.config_id);
-  const drafts = await redis.hGetAll(keys.drafts);
+  let pending = autoSubmitInFlight.get(attempt.id);
+  if (!pending) {
+    pending = (async () => {
+      const fresh = await pool.query('SELECT * FROM dsa_round_attempts WHERE id = $1', [attempt.id]);
+      const row = fresh.rows[0];
+      if (!row || row.status === 'SUBMITTED') return null;
 
-  const solutions = problems.map((p) => ({
-    problem_id: p.id,
-    source_code: drafts?.[p.id] || p.boilerplate_cpp || '',
-  }));
+      const problems = row.problem_ids ? await getProblemsByIds(row.problem_ids) : await getConfigProblems(row.config_id);
+      const draftKeys = redisKeys(row.id);
+      const drafts = await redis.hGetAll(draftKeys.drafts);
 
-  return await submit(userId, {
-    job_id: attempt.job_id,
-    attempt_id: attempt.id,
-    solutions,
-    is_auto: true,
-  });
+      const solutions = problems.map((prob) => ({
+        problem_id: prob.id,
+        source_code: drafts?.[prob.id] || prob.boilerplate_cpp || '',
+      }));
+
+      return await submit(userId, {
+        job_id: row.job_id,
+        attempt_id: row.id,
+        solutions,
+        is_auto: true,
+      });
+    })();
+    autoSubmitInFlight.set(attempt.id, pending);
+    pending.finally(() => {
+      autoSubmitInFlight.delete(attempt.id);
+    });
+  }
+
+  return await pending;
 };
 
 export const listBankProblems = async (userId, query) => {
@@ -714,7 +733,10 @@ export const getStatus = async (userId, query) => {
 
   await ensureRedisConnected();
   const keys = redisKeys(refreshedAttempt.id);
-  const [redisStatus, expiry] = await redis.mGet([keys.status, keys.expiry]);
+  const [redisStatus, expiry] =
+    typeof redis.mGet === 'function'
+      ? await redis.mGet([keys.status, keys.expiry])
+      : await Promise.all([redis.get(keys.status), redis.get(keys.expiry)]);
 
   const submittedProblemIds = await getSubmittedProblemIds(refreshedAttempt.id);
   const totalProblems = Array.isArray(refreshedAttempt.problem_ids) ? refreshedAttempt.problem_ids.length : 0;
@@ -871,7 +893,8 @@ export const submit = async (userId, body) => {
   const candidateId = await assertCandidateProfile(userId);
   await assertAssignedToJob(job_id, candidateId);
 
-  await rateLimit(`rl:dsa:submit:${candidateId}`, 10, 60);
+  // Multi-problem rounds legitimately POST submit once per problem; keep headroom for retries
+  await rateLimit(`rl:dsa:submit:${candidateId}`, 120, 60);
 
   const client = await pool.connect();
   try {

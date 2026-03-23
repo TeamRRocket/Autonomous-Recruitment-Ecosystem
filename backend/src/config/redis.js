@@ -20,7 +20,16 @@ if (isRedisDisabled) {
     isOpen: false,
     connect: async () => { console.log('Redis is disabled - using in-memory storage'); },
     get: async (key) => storage.get(key) || null,
-    set: async (key, value) => { storage.set(key, value); return 'OK'; },
+    /** Batch get (node-redis mGet) — required by DSA getStatus when Redis is disabled */
+    mGet: async (keys) => {
+      if (!Array.isArray(keys)) return [];
+      return keys.map((k) => storage.get(k) ?? null);
+    },
+    set: async (key, value, options) => {
+      if (options?.NX && storage.has(key)) return null;
+      storage.set(key, value);
+      return 'OK';
+    },
     del: async (key) => { 
       const existed = storage.has(key);
       storage.delete(key); 

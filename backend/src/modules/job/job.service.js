@@ -314,13 +314,13 @@ export const getJobScores = async (jobId) => {
         return { job_id: jobId, candidates: [] };
     }
 
-    const resumeRes = await pool.query(
-        `SELECT candidate_id, resume_score, updated_at
+    const appScoresRes = await pool.query(
+        `SELECT candidate_id, resume_score, technical_score, updated_at
          FROM applications
          WHERE job_id = $1 AND candidate_id = ANY($2::uuid[])`,
         [jobId, candidateIds]
     );
-    const resumeByCandidate = new Map(resumeRes.rows.map((r) => [r.candidate_id, r]));
+    const appScoresByCandidate = new Map(appScoresRes.rows.map((r) => [r.candidate_id, r]));
 
     const aptitudeRes = await pool.query(
         `SELECT a.candidate_id,
@@ -347,6 +347,14 @@ export const getJobScores = async (jobId) => {
         [jobId, candidateIds]
     );
     const dsaByCandidate = new Map(dsaRes.rows.map((r) => [r.candidate_id, r]));
+
+    const technicalAttemptsRes = await pool.query(
+        `SELECT candidate_id, status, final_score, submitted_at
+         FROM technical_interview_attempts
+         WHERE job_id = $1 AND candidate_id = ANY($2::uuid[])`,
+        [jobId, candidateIds]
+    );
+    const technicalAttemptByCandidate = new Map(technicalAttemptsRes.rows.map((r) => [r.candidate_id, r]));
 
     // Coding (non-DSA) rounds: compute per-candidate latest submission aggregate across CODING rounds for this job.
     // Score definition: percentage = average(pass_rate) across coding rounds that have a submission.
@@ -462,52 +470,104 @@ export const getJobScores = async (jobId) => {
     );
     const appProctoringByCandidate = new Map(appProctoringRes.rows.map((r) => [r.candidate_id, r]));
 
-    const candidates = candidatesRes.rows.map((r) => {
-        const resume = resumeByCandidate.get(r.candidate_id) || null;
-        const apt = aptitudeByCandidate.get(r.candidate_id) || null;
-        const dsa = dsaByCandidate.get(r.candidate_id) || null;
-        const coding = codingAggByCandidate.get(r.candidate_id) || { rounds: [], avg_score: null };
+    const candidates = candidatesRes.rows.map((row) => {
+        const appRow = appScoresByCandidate.get(row.candidate_id) || null;
+        const apt = aptitudeByCandidate.get(row.candidate_id) || null;
+        const dsa = dsaByCandidate.get(row.candidate_id) || null;
+        const techAttempt = technicalAttemptByCandidate.get(row.candidate_id) || null;
+        const coding = codingAggByCandidate.get(row.candidate_id) || { rounds: [], avg_score: null };
+
+        const resumePayload = appRow
+            ? { score: appRow.resume_score, computed_at: appRow.updated_at }
+            : { score: null, computed_at: null };
+
+        const aptitudePayload = apt
+            ? {
+                  status: apt.status,
+                  score: apt.score,
+                  correct: apt.correct_questions,
+                  total: apt.total_questions,
+                  percent:
+                      apt.total_questions > 0
+                          ? Math.round((Number(apt.correct_questions || 0) / Number(apt.total_questions)) * 100)
+                          : null,
+                  started_at: apt.started_at,
+                  ends_at: apt.ends_at,
+                  submitted_at: apt.submitted_at
+              }
+            : {
+                  status: 'not_started',
+                  score: null,
+                  correct: null,
+                  total: null,
+                  percent: null,
+                  started_at: null,
+                  ends_at: null,
+                  submitted_at: null
+              };
+
+        const dsaPayload = dsa
+            ? {
+                  status: dsa.status,
+                  score: dsa.final_score,
+                  started_at: dsa.started_at,
+                  ends_at: dsa.ends_at,
+                  submitted_at: dsa.submitted_at
+              }
+            : { status: 'not_started', score: null, started_at: null, ends_at: null, submitted_at: null };
+
+        const technicalFromApp = appRow?.technical_score != null ? Number(appRow.technical_score) : null;
+        const technicalFromAttempt =
+            techAttempt?.status === 'SUBMITTED' && techAttempt.final_score != null
+                ? Number(techAttempt.final_score)
+                : null;
+        const technicalRaw = technicalFromApp ?? technicalFromAttempt ?? null;
+        const technicalPayload = {
+            score: technicalRaw
+        };
+
+        // Total = Resume + Aptitude (%) + DSA + Technical; technical avg is 0–10 so ×10 to align with 0–100 scale
+        const n = (x) => (x == null || Number.isNaN(Number(x)) ? null : Number(x));
+        const resumeScore = appRow ? n(appRow.resume_score) : null;
+        let a = null;
+        if (apt && apt.total_questions > 0 && apt.correct_questions != null) {
+            a = Math.round((Number(apt.correct_questions) / Number(apt.total_questions)) * 100);
+        } else if (apt && apt.score != null) {
+            a = n(apt.score);
+        }
+        const d = dsa?.final_score != null ? n(dsa.final_score) : null;
+        let t = technicalRaw;
+        if (t != null && t <= 10) t = t * 10;
+        const parts = [resumeScore, a, d, t].filter((x) => x != null);
+        const total_score = parts.length > 0 ? Math.round(parts.reduce((acc, v) => acc + v, 0) * 10) / 10 : null;
 
         return {
             application: {
-                id: r.application_id,
-                status: r.application_status,
-                applied_at: r.applied_at
+                id: row.application_id,
+                status: row.application_status,
+                applied_at: row.applied_at
             },
             candidate: {
-                id: r.candidate_id,
-                name: r.candidate_name,
-                years_of_experience: r.years_of_experience,
-                primary_skills: r.primary_skills || [],
-                secondary_skills: r.secondary_skills || []
+                id: row.candidate_id,
+                name: row.candidate_name,
+                years_of_experience: row.years_of_experience,
+                primary_skills: row.primary_skills || [],
+                secondary_skills: row.secondary_skills || []
             },
             scores: {
-                resume: resume
-                    ? { score: resume.resume_score, computed_at: resume.updated_at }
-                    : { score: null, computed_at: null },
-                aptitude: apt
-                    ? {
-                        status: apt.status,
-                        score: apt.score,
-                        correct: apt.correct_questions,
-                        total: apt.total_questions,
-                        percent: apt.total_questions > 0 ? Math.round((Number(apt.correct_questions || 0) / Number(apt.total_questions)) * 100) : null,
-                        started_at: apt.started_at,
-                        ends_at: apt.ends_at,
-                        submitted_at: apt.submitted_at
-                    }
-                    : { status: 'not_started', score: null, correct: null, total: null, percent: null, started_at: null, ends_at: null, submitted_at: null },
-                dsa: dsa
-                    ? { status: dsa.status, score: dsa.final_score, started_at: dsa.started_at, ends_at: dsa.ends_at, submitted_at: dsa.submitted_at }
-                    : { status: 'not_started', score: null, started_at: null, ends_at: null, submitted_at: null },
+                resume: resumePayload,
+                aptitude: aptitudePayload,
+                dsa: dsaPayload,
+                technical: technicalPayload,
+                total_score,
                 coding: {
                     avg_score_percent: coding.avg_score,
                     rounds: coding.rounds
                 }
             },
             proctoring: (() => {
-                const proc = proctoringByCandidate.get(r.candidate_id);
-                const appProc = appProctoringByCandidate.get(r.candidate_id);
+                const proc = proctoringByCandidate.get(row.candidate_id);
+                const appProc = appProctoringByCandidate.get(row.candidate_id);
                 if (!proc && !appProc) return null;
                 return {
                     sessions: proc?.sessions || [],
