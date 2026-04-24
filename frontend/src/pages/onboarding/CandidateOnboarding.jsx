@@ -103,7 +103,7 @@ const CandidateOnboarding = () => {
                             <button
                                 type="button"
                                 onClick={handleBack}
-                                className="w-full px-4 py-2 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-800 transition-colors"
+                                className="w-full px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-accent transition-colors"
                             >
                                 Back
                             </button>
@@ -111,7 +111,7 @@ const CandidateOnboarding = () => {
                             <button
                                 type="button"
                                 onClick={handleLogout}
-                                className="w-full px-4 py-2 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-800 transition-colors"
+                                className="w-full px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
                             >
                                 Logout
                             </button>

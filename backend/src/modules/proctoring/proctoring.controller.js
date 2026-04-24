@@ -8,18 +8,18 @@ class ProctoringController {
      */
     async startSession(req, res, next) {
         try {
-            const { jobId, roundType, attemptId } = req.body;
+            const { jobId, roundType, attemptId, existingSessionId } = req.body;
             const userId = req.user.id;
 
             if (!jobId || !roundType || !attemptId) {
                 return next(new AppError('Missing required fields: jobId, roundType, attemptId', 400));
             }
 
-            if (!['APTITUDE', 'DSA'].includes(roundType)) {
-                return next(new AppError('Invalid round type. Must be APTITUDE or DSA', 400));
+            if (!['APTITUDE', 'DSA', 'TECHNICAL'].includes(roundType)) {
+                return next(new AppError('Invalid round type. Must be APTITUDE, DSA, or TECHNICAL', 400));
             }
 
-            const session = await proctoringService.startSession(userId, jobId, roundType, attemptId);
+            const session = await proctoringService.startSession(userId, jobId, roundType, attemptId, existingSessionId);
 
             res.status(201).json({
                 status: 'success',

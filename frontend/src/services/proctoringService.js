@@ -10,14 +10,15 @@ class ProctoringService {
     /**
      * Start a new proctoring session
      */
-    async startSession(jobId, roundType, attemptId) {
+    async startSession(jobId, roundType, attemptId, existingSessionId = null) {
         try {
             const response = await axios.post(
                 `${API_BASE_URL}/api/proctoring/start`,
                 {
                     jobId,
                     roundType,
-                    attemptId
+                    attemptId,
+                    existingSessionId
                 },
                 {
                     headers: {

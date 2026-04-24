@@ -3,12 +3,9 @@ import { ChevronUp, ChevronDown, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AVAILABLE_ROUNDS = [
-    { id: 'resume', name: 'Resume Screening', type: 'INTERVIEW' },
     { id: 'aptitude', name: 'Aptitude Round', type: 'MCQ' },
     { id: 'dsa', name: 'DSA Round', type: 'CODING' },
-    { id: 'tech1', name: 'Technical Round – 1', type: 'INTERVIEW' },
-    { id: 'tech2', name: 'Technical Round – 2', type: 'INTERVIEW' },
-    { id: 'hr', name: 'HR / Behavioral Round', type: 'INTERVIEW' }
+    { id: 'tech1', name: 'Technical Round - 1', type: 'INTERVIEW' }
 ];
 
 const isTechnicalRound = (round) =>
@@ -55,33 +52,38 @@ const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }
     };
 
     return (
-        <div className="space-y-8">
-            <div className="glass-card p-6">
-                <h3 className="text-lg font-semibold text-foreground font-heading mb-4 flex items-center gap-2">
-                    <CheckCircle2 className="text-primary" size={20} />
-                    Available Rounds
+        <div className="space-y-4 animate-fade-in text-foreground">
+            {/* Available Rounds Selection */}
+            <div className="bg-secondary/5 border border-border/20 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-foreground font-heading mb-3 flex items-center gap-2 uppercase tracking-wide">
+                    <CheckCircle2 className="text-primary" size={16} />
+                    Select Rounds
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {AVAILABLE_ROUNDS.map(round => {
                         const isSelected = selectedRounds.some(r => r.id === round.id);
                         return (
                             <button
                                 key={round.id}
                                 onClick={() => toggleRound(round)}
-                                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 text-left ${
-                                    isSelected
-                                    ? 'bg-primary/10 border-primary shadow-lg'
-                                    : 'bg-accent border-border hover:border-primary/50'
+                                className={`flex items-center justify-between p-3 rounded-md border transition-all duration-200 text-left group
+                                    ${isSelected 
+                                        ? 'bg-primary/10 border-primary shadow-sm' 
+                                        : 'bg-secondary/5 border-border/20 hover:border-primary/30 hover:bg-secondary/10'
                                     }`}
                             >
                                 <div className="flex flex-col">
-                                    <span className={`font-bold text-sm uppercase tracking-wide mb-1 ${isSelected ? 'text-primary/70' : 'text-muted-foreground/70'}`}>{round.type}</span>
-                                    <span className={`font-semibold ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>{round.name}</span>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${isSelected ? 'text-primary/80' : 'text-muted-foreground/60'}`}>
+                                        {round.type}
+                                    </span>
+                                    <span className={`text-sm font-medium ${isSelected ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/80'}`}>
+                                        {round.name}
+                                    </span>
                                 </div>
-                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                                    isSelected ? 'bg-primary border-primary text-white' : 'border-border'
+                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+                                    isSelected ? 'bg-primary border-primary text-white' : 'border-border/40 group-hover:border-primary/50'
                                     }`}>
-                                    {isSelected && <CheckCircle2 size={16} />}
+                                    {isSelected && <CheckCircle2 size={12} />}
                                 </div>
                             </button>
                         );
@@ -89,40 +91,40 @@ const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }
                 </div>
             </div>
 
+            {/* Selected Rounds Ordering */}
             {selectedRounds.length > 0 && (
-                <div className="glass-card p-6">
-                    <h3 className="text-lg font-semibold text-foreground font-heading mb-4">Round Order Strategy</h3>
-                    <div className="space-y-3">
-                        {selectedRounds.map((round, index) => (
+                <div className="bg-secondary/5 border border-border/20 rounded-lg p-4 space-y-3">
+                    <h3 className="text-sm font-semibold text-foreground font-heading uppercase tracking-wide">Round Sequence</h3>
+                    <div className="space-y-2">
+                        {selectedRounds.sort((a,b) => a.order - b.order).map((round, index) => (
                             <div
                                 key={round.id}
-                                className="flex items-center gap-4 bg-accent border border-border p-4 rounded-xl group hover:border-primary/50 transition-colors"
+                                className="flex items-center justify-between bg-secondary/5 border border-border/20 p-3 rounded-md group hover:border-primary/30 transition-all"
                             >
-                                <div className="flex flex-col items-center justify-center w-8 text-muted-foreground font-bold">
-                                    {index + 1}
+                                <div className="flex items-center gap-3">
+                                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
+                                        {index + 1}
+                                    </span>
+                                    <div>
+                                        <p className="font-medium text-sm text-foreground">{round.name}</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{round.type}</p>
+                                    </div>
                                 </div>
-                                <div className="flex-1">
-                                    <p className="font-semibold text-foreground">{round.name}</p>
-                                    <p className="text-xs text-muted-foreground uppercase tracking-widest">{round.type}</p>
-                                </div>
-                                <div className="flex gap-1">
-                                    <button
+                                
+                                <div className="flex items-center gap-1">
+                                    <button 
                                         onClick={() => moveRound(index, 'up')}
                                         disabled={index === 0}
-                                        className={`p-2 rounded-lg transition-colors ${
-                                            index === 0 ? 'text-muted-foreground/30' : 'text-muted-foreground hover:bg-accent/80 hover:text-foreground'
-                                            }`}
+                                        className="p-1 text-muted-foreground hover:text-primary disabled:opacity-30 disabled:hover:text-muted-foreground transition-colors"
                                     >
-                                        <ChevronUp size={20} />
+                                        <ChevronUp size={16} />
                                     </button>
-                                    <button
+                                    <button 
                                         onClick={() => moveRound(index, 'down')}
                                         disabled={index === selectedRounds.length - 1}
-                                        className={`p-2 rounded-lg transition-colors ${
-                                            index === selectedRounds.length - 1 ? 'text-muted-foreground/30' : 'text-muted-foreground hover:bg-accent/80 hover:text-foreground'
-                                            }`}
+                                        className="p-1 text-muted-foreground hover:text-primary disabled:opacity-30 disabled:hover:text-muted-foreground transition-colors"
                                     >
-                                        <ChevronDown size={20} />
+                                        <ChevronDown size={16} />
                                     </button>
                                 </div>
                             </div>
@@ -130,24 +132,14 @@ const Step2SelectRounds = ({ selectedRounds, setSelectedRounds, onNext, onBack }
                     </div>
                 </div>
             )}
-
-            <div className="pt-6 flex justify-between">
-                <button
-                    onClick={onBack}
-                    className="px-8 py-3 rounded-lg font-semibold border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
-                >
-                    Back to Details
-                </button>
+            
+            {/* Action Button - Mimicking Step 1 */}
+            <div className="pt-2">
                 <button
                     onClick={handleContinue}
-                    disabled={selectedRounds.length === 0}
-                    className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 ${
-                        selectedRounds.length > 0
-                        ? 'gradient-primary text-white shadow-lg hover:opacity-90'
-                        : 'bg-accent text-muted-foreground cursor-not-allowed border border-border'
-                        }`}
+                     className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-2.5 rounded-md transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-primary/20 text-sm"
                 >
-                    Configure Rounds Details
+                    Confirm Rounds & Configure
                 </button>
             </div>
         </div>

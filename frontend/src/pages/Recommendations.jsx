@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, ArrowRight, Target, Briefcase, MapPin, Building2, Clock } from 'lucide-react';
+import { Sparkles, ArrowRight, Target, Building2 } from 'lucide-react';
 import api from '../services/api';
 
 const Recommendations = () => {
@@ -25,14 +25,26 @@ const Recommendations = () => {
         fetchRecommendations();
     }, []);
 
+    const getMatchColor = (score) => {
+        if (score >= 80) return 'text-emerald-500';
+        if (score >= 60) return 'text-amber-500';
+        return 'text-red-500';
+    };
+
+    const getProgressBarColor = (score) => {
+        if (score >= 80) return 'bg-emerald-500';
+        if (score >= 60) return 'bg-amber-500';
+        return 'bg-red-500';
+    };
+
     if (loading) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="flex flex-col gap-8 animate-pulse">
-                    <div className="h-10 w-64 bg-accent rounded-xl" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="h-64 glass-card" />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="flex flex-col gap-6 animate-pulse">
+                    <div className="h-8 w-64 bg-secondary/20 rounded-lg" />
+                    <div className="flex flex-col gap-4">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-48 bg-secondary/10 rounded-xl" />
                         ))}
                     </div>
                 </div>
@@ -41,91 +53,91 @@ const Recommendations = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-                <div>
-                    <h1 className="text-4xl font-black font-heading gradient-text tracking-tight flex items-center gap-4">
-                        <Sparkles className="text-primary" size={36} />
-                        AI Recommendations
-                    </h1>
-                    <p className="text-muted-foreground mt-3 text-lg font-medium">
-                        Personalized matches based on your unique skill set and profile.
-                    </p>
-                </div>
-
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+            <div className="mb-8">
+                <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                    <Sparkles className="text-primary fill-primary/20" size={24} />
+                    AI Recommendations
+                </h1>
+                <p className="text-muted-foreground mt-1 text-sm">
+                    Jobs matched to your profile using AI analysis
+                </p>
             </div>
 
             {recommendations.length === 0 ? (
-                <div className="py-24 text-center glass-card border-dashed">
-                    <div className="w-20 h-20 bg-accent rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl border border-border">
-                        <Target size={40} className="text-muted-foreground" />
+                <div className="py-24 text-center bg-secondary/5 rounded-2xl border border-dashed border-border/40">
+                    <div className="w-16 h-16 bg-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Target size={32} className="text-muted-foreground" />
                     </div>
-                    <h3 className="text-2xl font-bold font-heading text-foreground mb-2 tracking-tight">No recommendations yet</h3>
-                    <p className="text-muted-foreground max-w-sm mx-auto font-medium">
+                    <h3 className="text-lg font-bold text-foreground mb-2">No recommendations yet</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
                         Update your profile with more skills to get personalized job matches.
                     </p>
                     <Link
                         to="/profile"
-                        className="mt-8 inline-flex items-center px-6 py-3 gradient-primary hover:opacity-90 text-white rounded-2xl font-bold transition-all shadow-lg"
+                        className="inline-flex items-center px-5 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-primary/20"
                     >
                         Update Profile
                     </Link>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="flex flex-col gap-4">
                     {recommendations.map((job) => (
-                        <Link
+                        <div
                             key={job.job_id}
-                            to={`/jobs/${job.job_id}`}
-                            className="group relative glass-card rounded-3xl p-8 hover:border-primary/40 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/10 flex flex-col animate-slide-up"
+                            className="bg-card hover:bg-card/80 border border-border/40 rounded-xl p-6 transition-all duration-300 group"
                         >
-                            <div className="absolute top-8 right-8">
-                                <div className="flex flex-col items-end gap-1">
-                                    <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Match Score</div>
-                                    <div className={`text-2xl font-black font-heading px-4 py-1 rounded-2xl border ${job.match_score > 0
-                                        ? 'text-primary bg-primary/10 border-primary/20'
-                                        : 'text-muted-foreground bg-accent border-border'
-                                        }`}>
+                            {/* Header Section */}
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
+                                        {job.job_title}
+                                    </h3>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <Building2 size={14} className="text-muted-foreground" />
+                                        <p className="text-sm text-muted-foreground">
+                                            {job.company || "Autonomous Ecosystem"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className={`text-2xl font-bold ${getMatchColor(job.match_score)}`}>
                                         {job.match_score}%
                                     </div>
-                                </div>
-                            </div>
-
-                            <div className="mb-8">
-                                <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 border border-primary/20 group-hover:gradient-primary group-hover:text-white transition-all duration-500">
-                                    <Briefcase size={22} />
-                                </div>
-                                <h3 className="text-2xl font-bold font-heading text-foreground group-hover:text-primary transition-colors leading-tight mb-2">
-                                    {job.job_title}
-                                </h3>
-                                <div className="flex items-center gap-2 text-muted-foreground font-bold text-[10px] uppercase tracking-wider">
-                                    <Building2 size={14} />
-                                    Autonomous Ecosystem
-                                </div>
-                            </div>
-
-                            <div className="space-y-4 mb-8 flex-1">
-                                <div className="p-5 bg-accent rounded-3xl border border-border group-hover:border-primary/20 transition-all">
-                                    <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
-                                        <Sparkles size={12} />
-                                        AI Insights
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                                        Match
                                     </div>
-                                    <p className="text-sm text-muted-foreground font-medium leading-relaxed italic">
-                                        "{job.reason}"
+                                </div>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="w-full bg-secondary/30 h-1.5 rounded-full mb-6 overflow-hidden">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-1000 ease-out ${getProgressBarColor(job.match_score)}`}
+                                    style={{ width: `${job.match_score}%` }}
+                                />
+                            </div>
+
+                            {/* Included Insight Box */}
+                            <div className="bg-secondary/10 rounded-lg p-4 mb-6 border border-border/10">
+                                <div className="flex gap-3 items-start">
+                                    <Sparkles className="w-4 h-4 text-primary mt-1 shrink-0" />
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        {job.reason}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between pt-6 border-t border-border mt-auto">
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-                                    <Clock size={14} />
-                                    Updated Today
-                                </div>
-                                <div className="text-primary group-hover:translate-x-1 transition-transform">
-                                    <ArrowRight size={20} />
-                                </div>
+                            {/* Action Button */}
+                            <div>
+                                <Link
+                                    to={`/jobs/${job.job_id}`}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-secondary/20 hover:bg-secondary/30 text-foreground text-sm font-medium rounded-lg transition-colors group-hover:translate-x-1"
+                                >
+                                    View Job <ArrowRight size={16} />
+                                </Link>
                             </div>
-                        </Link>
+                        </div>
                     ))}
                 </div>
             )}

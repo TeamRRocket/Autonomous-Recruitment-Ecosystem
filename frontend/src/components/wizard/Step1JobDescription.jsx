@@ -1,264 +1,223 @@
-import React, { useState, useEffect } from 'react';
-import InputGroup from '../ui/InputGroup';
-import { Plus, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Step1JobDescription = ({ formData, setFormData, onNext }) => {
     const [localData, setLocalData] = useState({
         title: formData.title || '',
-        department: formData.department || '',
         location: formData.location || '',
         type: formData.type || 'Full-time',
         experience_level: formData.experience_level || 'ENTRY',
-        description: formData.description || '',
-        responsibilities: formData.responsibilities || [],
-        expires_at: formData.expires_at || '',
         degree: formData.degree || "Bachelor's",
-        preferred_qualifications: formData.preferred_qualifications || []
+        department: formData.department || '',
+        responsibilities: formData.responsibilities || [], // Mapping to "Required Skills"
+        description: formData.description || '',
+        expires_at: formData.expires_at || '',
     });
 
-    const [currentResp, setCurrentResp] = useState('');
-    const [currentPref, setCurrentPref] = useState('');
+    const [skillInput, setSkillInput] = useState('');
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setLocalData(prev => ({ ...prev, [name]: value }));
     };
 
-    const addResponsibility = () => {
-        if (!currentResp.trim()) return;
-        if (localData.responsibilities.includes(currentResp.trim())) {
-            toast.error('Requirement already exists');
+    const handleAddSkill = (e) => {
+        if ((e.key === 'Enter' || e.type === 'click') && skillInput.trim()) {
+            e.preventDefault();
+            if (!localData.responsibilities.includes(skillInput.trim())) {
+                setLocalData(prev => ({
+                    ...prev,
+                    responsibilities: [...prev.responsibilities, skillInput.trim()]
+                }));
+            }
+            setSkillInput('');
+        }
+    };
+
+    const removeSkill = (skill) => {
+        setLocalData(prev => ({
+            ...prev,
+            responsibilities: prev.responsibilities.filter(s => s !== skill)
+        }));
+    };
+
+    const handleNext = () => {
+        // Basic validation
+        if (!localData.title || !localData.location || !localData.description || !localData.expires_at) {
+            toast.error('Please fill in all required fields');
             return;
         }
-        setLocalData(prev => ({
-            ...prev,
-            responsibilities: [...prev.responsibilities, currentResp.trim()]
-        }));
-        setCurrentResp('');
-    };
-
-    const removeResponsibility = (respToRemove) => {
-        setLocalData(prev => ({
-            ...prev,
-            responsibilities: prev.responsibilities.filter(r => r !== respToRemove)
-        }));
-    };
-
-    const addPreferredQual = () => {
-        if (!currentPref.trim()) return;
-        if (localData.preferred_qualifications.includes(currentPref.trim())) {
-            toast.error('Qualification already exists');
+        if (localData.responsibilities.length === 0) {
+            toast.error('Please add at least one required skill');
             return;
         }
-        setLocalData(prev => ({
-            ...prev,
-            preferred_qualifications: [...prev.preferred_qualifications, currentPref.trim()]
-        }));
-        setCurrentPref('');
-    };
-
-    const removePreferredQual = (qualToRemove) => {
-        setLocalData(prev => ({
-            ...prev,
-            preferred_qualifications: prev.preferred_qualifications.filter(q => q !== qualToRemove)
-        }));
-    };
-
-    const isFormValid = () => {
-        const { title, department, location, description, responsibilities, expires_at } = localData;
-        const isFutureDate = expires_at ? new Date(expires_at) > new Date() : false;
-
-        return (
-            title.trim() !== '' &&
-            department.trim() !== '' &&
-            location.trim() !== '' &&
-            description.trim().length >= 50 &&
-            responsibilities.length > 0 &&
-            isFutureDate
-        );
-    };
-
-    const handleContinue = () => {
-        if (!isFormValid()) {
-            toast.error('Please fill all required fields correctly');
-            return;
-        }
-        setFormData(prev => ({ ...prev, ...localData }));
         onNext(localData);
     };
 
-    const handleRespKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            addResponsibility();
-        }
-    };
-
     return (
-        <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputGroup
-                    label="Job Title"
-                    name="title"
-                    placeholder="e.g. Senior Frontend Engineer"
-                    required
-                    value={localData.title}
-                    onChange={handleChange}
-                />
-                <InputGroup
-                    label="Department"
-                    name="department"
-                    placeholder="e.g. Engineering, Sales"
-                    required
-                    value={localData.department}
-                    onChange={handleChange}
-                />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <InputGroup
-                    label="Location"
-                    name="location"
-                    placeholder="e.g. Remote, Mumbai"
-                    required
-                    value={localData.location}
-                    onChange={handleChange}
-                />
-                <InputGroup
-                    label="Job Type"
-                    name="type"
-                    options={['Full-time', 'Part-time', 'Internship']}
-                    required
-                    value={localData.type}
-                    onChange={handleChange}
-                />
-                <InputGroup
-                    label="Experience Level"
-                    name="experience_level"
-                    options={['ENTRY', 'MID', 'SENIOR', 'ADVANCED']}
-                    required
-                    value={localData.experience_level}
-                    onChange={handleChange}
-                />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputGroup
-                    label="Minimum Degree Requirement"
-                    name="degree"
-                    options={["Bachelor's", "Master's", "PhD", "Associate", "No Degree Required"]}
-                    required
-                    value={localData.degree}
-                    onChange={handleChange}
-                />
-            </div>
-
-            <InputGroup
-                label="Job Description"
-                name="description"
-                isTextArea
-                placeholder="Describe the role and your company (min 50 chars)..."
-                required
-                value={localData.description}
-                onChange={handleChange}
-                rows={4}
-            />
-
-            <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                    Minimum Qualifications / Responsibilities <span className="text-destructive">*</span>
-                </label>
-                <div className="flex gap-2 mb-2">
+        <div className="space-y-4 animate-fade-in text-sm text-foreground">
+            {/* Row 1: Title (50%), Location (50%) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job Title</label>
                     <input
                         type="text"
-                        className="input-field flex-1 bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring focus:border-ring block sm:text-sm rounded-lg p-2.5"
-                        placeholder="Add a minimum qualification..."
-                        value={currentResp}
-                        onChange={(e) => setCurrentResp(e.target.value)}
-                        onKeyDown={handleRespKeyDown}
+                        name="title"
+                        value={localData.title}
+                        onChange={handleChange}
+                        className="w-full bg-secondary/5 border border-border/20 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-muted-foreground/30 text-foreground"
+                        placeholder="e.g. Senior Frontend Engineer"
                     />
-                    <button
-                        type="button"
-                        onClick={addResponsibility}
-                        className="px-4 py-2 bg-accent hover:bg-accent/80 text-foreground rounded-lg transition-colors flex items-center border border-border"
-                    >
-                        <Plus size={18} />
-                    </button>
                 </div>
-                <div className="flex flex-wrap gap-2 mt-3">
-                    {localData.responsibilities.map((resp, idx) => (
-                        <div key={idx} className="flex items-center bg-primary/10 border border-primary/30 text-primary px-3 py-1.5 rounded-lg text-sm">
-                            <span>{resp}</span>
-                            <button
-                                type="button"
-                                onClick={() => removeResponsibility(resp)}
-                                className="ml-2 text-primary hover:text-foreground"
-                            >
-                                <X size={14} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                    Preferred Qualifications
-                </label>
-                <div className="flex gap-2 mb-2">
+                <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Location</label>
                     <input
                         type="text"
-                        className="input-field flex-1 bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-ring focus:border-ring block sm:text-sm rounded-lg p-2.5"
-                        placeholder="Add a preferred qualification (optional)..."
-                        value={currentPref}
-                        onChange={(e) => setCurrentPref(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPreferredQual())}
+                        name="location"
+                        value={localData.location}
+                        onChange={handleChange}
+                        className="w-full bg-secondary/5 border border-border/20 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-muted-foreground/30 text-foreground"
+                        placeholder="e.g. Remote"
                     />
-                    <button
-                        type="button"
-                        onClick={addPreferredQual}
-                        className="px-4 py-2 bg-accent hover:bg-accent/80 text-foreground rounded-lg transition-colors flex items-center border border-border"
-                    >
-                        <Plus size={18} />
-                    </button>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-3">
-                    {localData.preferred_qualifications.map((qual, idx) => (
-                        <div key={idx} className="flex items-center bg-secondary/10 border border-secondary/30 text-secondary px-3 py-1.5 rounded-lg text-sm">
-                            <span>{qual}</span>
-                            <button
-                                type="button"
-                                onClick={() => removePreferredQual(qual)}
-                                className="ml-2 text-secondary hover:text-foreground"
-                            >
-                                <X size={14} />
-                            </button>
-                        </div>
-                    ))}
                 </div>
             </div>
 
-            <InputGroup
-                label="Job Ending Date"
-                name="expires_at"
-                type="date"
-                required
-                value={localData.expires_at}
-                onChange={handleChange}
-            />
+            {/* Row 2: Type (50%), Experience (50%) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job Type</label>
+                    <div className="relative">
+                        <select
+                            name="type"
+                            value={localData.type}
+                            onChange={handleChange}
+                            className="w-full bg-secondary/5 border border-border/20 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50 focus:border-primary outline-none transition-all appearance-none text-foreground"
+                        >
+                            <option>Full-time</option>
+                            <option>Part-time</option>
+                            <option>Contract</option>
+                            <option>Internship</option>
+                        </select>
+                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Experience Level</label>
+                    <div className="relative">
+                        <select
+                            name="experience_level"
+                            value={localData.experience_level}
+                            onChange={handleChange}
+                            className="w-full bg-secondary/5 border border-border/20 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50 focus:border-primary outline-none transition-all appearance-none text-foreground"
+                        >
+                            <option value="ENTRY">Entry Level</option>
+                            <option value="MID">3-5 years</option>
+                            <option value="SENIOR">Senior Level</option>
+                            <option value="LEAD">Lead / Architect</option>
+                            <option value="EXECUTIVE">Executive</option>
+                        </select>
+                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            <div className="pt-6 flex justify-end">
+            {/* Row 3: Degree (50%), Skills (50%) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Degree</label>
+                    <div className="relative">
+                        <select
+                            name="degree"
+                            value={localData.degree}
+                            onChange={handleChange}
+                            className="w-full bg-secondary/5 border border-border/20 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50 focus:border-primary outline-none transition-all appearance-none text-foreground"
+                        >
+                            <option>None</option>
+                            <option>High School</option>
+                            <option>Associate's</option>
+                            <option>Bachelor's</option>
+                            <option>BS in Computer Science</option>
+                            <option>Master's</option>
+                            <option>PhD</option>
+                        </select>
+                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </div>
+                    </div>
+                </div>
+                 <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Skills</label>
+                    <div className="w-full bg-secondary/5 border border-border/20 rounded-md px-3 py-1.5 focus-within:ring-1 focus-within:ring-primary/50 focus-within:border-primary transition-all flex flex-wrap gap-1.5 min-h-[38px] items-center">
+                        {localData.responsibilities.map((skill, idx) => (
+                            <span key={idx} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs font-medium flex items-center gap-1 border border-primary/20">
+                                {skill}
+                                <button onClick={() => removeSkill(skill)} className="hover:text-primary/70">
+                                    <X size={10} />
+                                </button>
+                            </span>
+                        ))}
+                        <input
+                            type="text"
+                            value={skillInput}
+                            onChange={(e) => setSkillInput(e.target.value)}
+                            onKeyDown={handleAddSkill}
+                            className="bg-transparent outline-none flex-1 min-w-[80px] text-foreground placeholder:text-muted-foreground/30 text-xs h-full py-1"
+                            placeholder="Add skill..."
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: Description */}
+            <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
+                <textarea
+                    name="description"
+                    value={localData.description}
+                    onChange={handleChange}
+                    rows={3}
+                    className="w-full bg-secondary/5 border border-border/20 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50 focus:border-primary outline-none transition-all placeholder:text-muted-foreground/30 resize-none text-foreground"
+                    placeholder="Describe the role..."
+                />
+            </div>
+            
+            {/* Additional Fields (Department, Deadline) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Department</label>
+                    <input
+                        type="text"
+                        name="department"
+                        value={localData.department}
+                        onChange={handleChange}
+                        className="w-full bg-secondary/5 border border-border/20 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50 outline-none text-foreground placeholder:text-muted-foreground/30"
+                        placeholder="e.g. Engineering"
+                    />
+                </div>
+                 <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Deadline</label>
+                    <input
+                        type="date"
+                        name="expires_at"
+                        value={localData.expires_at}
+                        onChange={handleChange}
+                        className="w-full bg-secondary/5 border border-border/20 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50 outline-none text-foreground placeholder:text-muted-foreground/30" 
+                    />
+                </div>
+            </div>
+
+            {/* Action Button */}
+            <div className="pt-2">
                 <button
-                    onClick={handleContinue}
-                    disabled={!isFormValid()}
-                    className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 ${
-                        isFormValid()
-                        ? 'gradient-primary text-white shadow-lg hover:opacity-90'
-                        : 'bg-accent text-muted-foreground cursor-not-allowed border border-border'
-                        }`}
+                    onClick={handleNext}
+                    className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-2.5 rounded-md transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-primary/20 text-sm"
                 >
-                    Continue to Rounds Selection
+                    Save & Next Step
                 </button>
             </div>
         </div>

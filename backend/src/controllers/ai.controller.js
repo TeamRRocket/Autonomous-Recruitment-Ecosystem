@@ -36,7 +36,11 @@ export const rankCandidates = catchAsync(async (req, res, next) => {
             a.resume_score,
             a.rank,
             a.resume_score_breakdown,
-            a.resume_summary
+            a.resume_summary,
+            a.total_score,
+            a.overall_summary AS summary,
+            a.strengths,
+            a.gaps
      FROM applications a
      JOIN candidate_profiles cp ON a.candidate_id = cp.id
      WHERE a.job_id = $1

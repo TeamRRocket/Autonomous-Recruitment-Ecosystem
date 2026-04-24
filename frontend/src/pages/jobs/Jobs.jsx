@@ -260,20 +260,20 @@ const Jobs = () => {
             {/* Main Content */}
             <main className="flex-1 space-y-8">
                 {/* Search Bar */}
-                <div className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-3 shadow-xl backdrop-blur-md">
+                <div className="glass-card rounded-2xl p-2 shadow-xl backdrop-blur-md">
                     <div className="relative group">
-                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors" size={20} />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={20} />
                         <input
                             type="text"
                             placeholder="What do you want to do?"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-transparent border-none rounded-[2rem] py-4 pl-14 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-0 text-lg font-medium"
+                            className="w-full bg-transparent border-none rounded-xl py-3 pl-12 pr-10 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0 text-lg font-medium"
                         />
                         {searchTerm && (
                             <button
                                 onClick={() => setSearchTerm('')}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white p-2"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-2"
                             >
                                 <X size={18} />
                             </button>
@@ -284,13 +284,10 @@ const Jobs = () => {
                 {/* Info Bar */}
                 <div className="flex items-center justify-between px-2">
                     <div className="flex items-center gap-3">
-                        <span className="text-2xl font-black text-white">{filteredJobs.length.toLocaleString()}</span>
-                        <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Jobs matched</span>
+                        <span className="text-2xl font-black text-foreground font-heading">{filteredJobs.length.toLocaleString()}</span>
+                        <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Jobs matched</span>
                     </div>
-
                 </div>
-
-
 
                 {/* Job List */}
                 <div className="space-y-6">
@@ -298,34 +295,34 @@ const Jobs = () => {
                         filteredJobs.map((job) => (
                             <div
                                 key={job.id}
-                                className="bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden hover:border-primary/30 transition-all duration-300 group shadow-lg"
+                                className="glass-card rounded-2xl overflow-hidden hover:border-primary/50 transition-all duration-300 group shadow-lg"
                             >
                                 <div className="p-8 pb-4">
                                     <div className="flex justify-between items-start mb-6">
                                         <div className="space-y-1">
-                                            <h3 className="text-2xl font-bold text-white group-hover:text-primary transition-colors cursor-pointer">
+                                            <h3 className="text-2xl font-bold font-heading text-foreground group-hover:text-primary transition-colors cursor-pointer">
                                                 {job.title}
                                             </h3>
-                                            <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-400">
+                                            <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-muted-foreground">
                                                 <div className="flex items-center gap-1.5">
-                                                    <Building2 size={16} className="text-slate-600" />
+                                                    <Building2 size={16} className="text-primary/70" />
                                                     {job.organization_name || 'Autonomous Startup'}
                                                 </div>
-                                                <span className="text-slate-700">•</span>
+                                                <span className="text-border">•</span>
                                                 <div className="flex items-center gap-1.5">
-                                                    <MapPin size={16} className="text-slate-600" />
+                                                    <MapPin size={16} className="text-primary/70" />
                                                     {job.location}
                                                 </div>
-                                                <span className="text-slate-700">•</span>
+                                                <span className="text-border">•</span>
                                                 <div className="flex items-center gap-1.5 capitalize">
-                                                    <Layers size={16} className="text-slate-600" />
+                                                    <Layers size={16} className="text-primary/70" />
                                                     {job.experience_level?.toLowerCase()} Level
                                                 </div>
                                                 {job.degree && (
                                                     <>
-                                                        <span className="text-slate-700">•</span>
+                                                        <span className="text-border">•</span>
                                                         <div className="flex items-center gap-1.5">
-                                                            <GraduationCap size={16} className="text-slate-600" />
+                                                            <GraduationCap size={16} className="text-primary/70" />
                                                             {job.degree}
                                                         </div>
                                                     </>
@@ -337,32 +334,32 @@ const Jobs = () => {
 
                                     {/* Minimum Qualifications */}
                                     <div className="space-y-4">
-                                        <h4 className="text-sm font-bold text-white uppercase tracking-wider">Minimum qualifications</h4>
+                                        <h4 className="text-sm font-bold text-foreground font-heading uppercase tracking-wider">Minimum qualifications</h4>
                                         <ul className="space-y-2.5">
                                             {(job.requirements || []).slice(0, 3).map((req, i) => (
-                                                <li key={i} className="flex items-start text-sm text-slate-400 leading-relaxed">
-                                                    <span className="mr-3 mt-1.5 w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0"></span>
+                                                <li key={i} className="flex items-start text-sm text-muted-foreground leading-relaxed">
+                                                    <span className="mr-3 mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0"></span>
                                                     {req}
                                                 </li>
                                             ))}
                                             {(job.requirements || []).length > 3 && (
                                                 <li className="text-xs text-primary font-bold ml-4.5 cursor-pointer hover:underline">
-                                                    + {(job.preferred_qualifications?.length || 0) + (job.requirements.length - 3)} more qualifications
+                                                    + {(job.requirements.length - 3)} more qualifications
                                                 </li>
                                             )}
                                         </ul>
                                     </div>
                                 </div>
 
-                                <div className="px-8 py-6 bg-slate-800/30 border-t border-slate-800 flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
+                                <div className="px-8 py-6 bg-accent/30 border-t border-border flex items-center justify-between">
+                                    <div className="flex items-center gap-4 w-full justify-between">
                                         <a
                                             href={`/jobs/${job.id}`}
                                             className="px-6 py-2.5 bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/20 rounded-xl text-sm font-bold transition-all"
                                         >
                                             Learn more
                                         </a>
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-1.5">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
                                             <Clock size={12} />
                                             Posted {new Date(job.created_at).toLocaleDateString()}
                                         </span>
@@ -371,17 +368,17 @@ const Jobs = () => {
                             </div>
                         ))
                     ) : (
-                        <div className="py-24 text-center bg-slate-900/40 border border-slate-800 border-dashed rounded-[3rem]">
-                            <div className="w-20 h-20 bg-slate-900 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl border border-slate-800">
-                                <Search size={40} className="text-slate-700" />
+                        <div className="py-24 text-center bg-card/30 border border-border border-dashed rounded-3xl">
+                            <div className="w-20 h-20 bg-accent rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl border border-border">
+                                <Search size={40} className="text-muted-foreground" />
                             </div>
-                            <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">No matching roles found</h3>
-                            <p className="text-slate-500 max-w-sm mx-auto font-medium">
+                            <h3 className="text-2xl font-bold font-heading text-foreground mb-2 tracking-tight">No matching roles found</h3>
+                            <p className="text-muted-foreground max-w-sm mx-auto font-medium">
                                 We couldn't find any jobs matching your current filter criteria. Try adjusting your search or filters.
                             </p>
                             <button
                                 onClick={clearFilters}
-                                className="mt-8 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold transition-all border border-slate-700"
+                                className="mt-8 px-6 py-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-2xl font-bold transition-all border border-border"
                             >
                                 Reset all filters
                             </button>

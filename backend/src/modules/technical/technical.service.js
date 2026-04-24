@@ -85,7 +85,16 @@ class TechnicalService {
       throw new AppError('No questions available for this technical interview', 500);
     }
 
-    const attempt = await technicalRepository.createAttempt(candidateId, jobId, endsAt, questionIds);
+    let attempt;
+    try {
+      attempt = await technicalRepository.createAttempt(candidateId, jobId, endsAt, questionIds);
+    } catch (err) {
+      if (err.code === '23505') { // unique_violation
+        return this.start(userId, body);
+      }
+      throw err;
+    }
+
     const questions = await technicalRepository.getQuestionsByIds(questionIds);
 
     return {

@@ -12,10 +12,10 @@ const RoundConfigCard = ({ round, index, onUpdate }) => {
     };
 
     return (
-        <div className="glass-card overflow-hidden group hover:border-primary/30 transition-all duration-300">
-            <div className="bg-accent px-6 py-4 border-b border-border flex items-center justify-between">
+        <div className="bg-secondary/5 border border-border/20 rounded-lg overflow-hidden group hover:border-primary/30 transition-all duration-300">
+            <div className="bg-secondary/10 px-4 py-3 border-b border-border/20 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">
+                    <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs ring-1 ring-primary/20">
                         {index + 1}
                     </div>
                     <div>
@@ -24,55 +24,73 @@ const RoundConfigCard = ({ round, index, onUpdate }) => {
                             name="round_name"
                             value={round.round_name || round.name}
                             onChange={handleChange}
-                            className="bg-transparent border-none text-foreground font-bold focus:ring-0 p-0 text-lg w-full"
+                            className="bg-transparent border-none text-foreground font-semibold focus:ring-0 p-0 text-sm w-full placeholder:text-muted-foreground/50"
                             placeholder="Round Name"
                         />
-                        <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase mt-0.5">{round.type}</p>
+                        <p className="text-[10px] text-muted-foreground font-medium tracking-wider uppercase mt-0.5 opacity-70">{round.type}</p>
                     </div>
                 </div>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <InputGroup
-                    label="Duration (mins)"
-                    name="duration_minutes"
-                    type="number"
-                    required
-                    value={round.duration_minutes || ''}
-                    onChange={handleChange}
-                    placeholder="e.g. 60"
-                />
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Duration (mins)</label>
+                    <input
+                        type="number"
+                        name="duration_minutes"
+                        value={round.duration_minutes || ''}
+                        onChange={handleChange}
+                        className="w-full bg-secondary/5 border border-border/20 rounded-md px-2.5 py-1.5 text-sm focus:ring-1 focus:ring-primary/50 outline-none text-foreground"
+                        placeholder="e.g. 60"
+                        required
+                    />
+                </div>
 
                 {(round.type === 'MCQ' || round.type === 'CODING' || isTechnicalRound(round)) && (
-                    <InputGroup
-                        label={isTechnicalRound(round) ? 'No. of Questions to Ask' : 'No. of Questions'}
-                        name="num_questions"
-                        type="number"
-                        required
-                        value={round.num_questions || ''}
-                        onChange={handleChange}
-                        placeholder="e.g. 20"
-                    />
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                            {isTechnicalRound(round) ? 'Questions' : 'Question Count'}
+                        </label>
+                        <input
+                            type="number"
+                            name="num_questions"
+                            value={round.num_questions || ''}
+                            onChange={handleChange}
+                             className="w-full bg-secondary/5 border border-border/20 rounded-md px-2.5 py-1.5 text-sm focus:ring-1 focus:ring-primary/50 outline-none text-foreground"
+                            placeholder="e.g. 20"
+                            required
+                        />
+                    </div>
                 )}
 
-                <InputGroup
-                    label="Difficulty"
-                    name="difficulty_level"
-                    options={['EASY', 'MEDIUM', 'HARD']}
-                    required
-                    value={round.difficulty_level || 'MEDIUM'}
-                    onChange={handleChange}
-                />
+                <div className="space-y-1">
+                     <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Difficulty</label>
+                    <div className="relative">
+                        <select
+                            name="difficulty_level"
+                            value={round.difficulty_level || 'MEDIUM'}
+                            onChange={handleChange}
+                             className="w-full bg-secondary/5 border border-border/20 rounded-md px-2.5 py-1.5 text-sm focus:ring-1 focus:ring-primary/50 outline-none appearance-none text-foreground"
+                        >
+                            <option value="EASY">Easy</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HARD">Hard</option>
+                        </select>
+                    </div>
+                </div>
 
-                <InputGroup
-                    label="Passing Score (%)"
-                    name="passing_score"
-                    type="number"
-                    required
-                    value={round.passing_score || 60}
-                    onChange={handleChange}
-                    placeholder="e.g. 70"
-                />
+                <div className="space-y-1">
+                     <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Pass Score (%)</label>
+                    <input
+                        type="number"
+                        name="passing_score"
+                        value={round.passing_score || 60}
+                        onChange={handleChange}
+                         className="w-full bg-secondary/5 border border-border/20 rounded-md px-2.5 py-1.5 text-sm focus:ring-1 focus:ring-primary/50 outline-none text-foreground"
+                        placeholder="e.g. 70"
+                        required
+                    />
+                </div>
             </div>
         </div>
     );

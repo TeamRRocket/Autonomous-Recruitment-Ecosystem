@@ -69,16 +69,21 @@ Return your evaluation in the following JSON format:
 """
 
     # Get LLM endpoint from environment
-    llm_endpoint = os.getenv('LLM_ENDPOINT', 'http://localhost:11434/api/generate')
+    llm_endpoint = os.getenv('LLM_ENDPOINT', 'http://localhost:11434/api/chat')
     model = os.getenv('LLM_MODEL', 'llama3')
     
     try:
-        # Call LLM API (Ollama format)
+        # Call LLM API (Ollama chat format)
         response = requests.post(
             llm_endpoint,
             json={
                 "model": model,
-                "prompt": prompt,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
                 "stream": False,
                 "format": "json"
             },
@@ -88,10 +93,10 @@ Return your evaluation in the following JSON format:
         if response.status_code == 200:
             result = response.json()
             
-            # Parse the response
-            if 'response' in result:
-                try:
-                    evaluation = json.loads(result['response'])
+            # Parse the response (chat format uses 'message' instead of 'response')
+            content = result.get('message', {}).get('content', '')
+            try:
+                evaluation = json.loads(content)
                     
                     # Validate and normalize scores
                     correctness = max(0, min(10, float(evaluation.get('correctness', 5))))

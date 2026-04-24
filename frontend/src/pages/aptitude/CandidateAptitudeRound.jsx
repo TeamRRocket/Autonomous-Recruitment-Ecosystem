@@ -1,21 +1,10 @@
-/**
- * INTEGRATION EXAMPLE: Aptitude Round with Proctoring
- * 
- * This example shows how to integrate proctoring into CandidateAptitudeRound.jsx
- * 
- * FLOW:
- * 1. User clicks "Start Round" button
- * 2. Consent modal appears
- * 3. If user accepts → Request camera permission
- * 4. If permission granted → Start exam + proctoring
- * 5. If permission denied → Block exam, show error
- * 6. Camera stays on for entire exam duration
- * 7. Camera turns off only after exam completion
- */
+// Refactored CandidateAptitudeRound.jsx to match Reference UI
+// Key Changes: Sidebar Navigation, Single Question View, Fixed Timer, Clean Dark UI
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { ChevronLeft, ChevronRight, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { startAptitudeRound, submitAptitudeRound } from '../../services/aptitudeService';
 import { getRounds } from '../../services/roundService';
 import { getNextRoundAfter, getNavigatePathForRound } from '../../utils/candidateRoundNavigation';
@@ -30,20 +19,20 @@ const CandidateAptitudeRound = () => {
     const { jobId } = useParams();
     const navigate = useNavigate();
 
-    // Existing state
+    // --- State ---
     const [loading, setLoading] = useState(false);
     const [attemptId, setAttemptId] = useState(null);
     const [endsAt, setEndsAt] = useState(null);
-    const [durationMinutes, setDurationMinutes] = useState(null);
     const [questions, setQuestions] = useState([]);
     const [selectedByQuestion, setSelectedByQuestion] = useState({});
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [submitting, setSubmitting] = useState(false);
     const [result, setResult] = useState(null);
     const [nowTick, setNowTick] = useState(Date.now());
     const [autoSubmitted, setAutoSubmitted] = useState(false);
     const [redirected, setRedirected] = useState(false);
 
-    // NEW: Proctoring state
+    // --- Proctoring State ---
     const alreadyConsented = sessionStorage.getItem('proctoring_consent') === 'true';
     const [showConsent, setShowConsent] = useState(!alreadyConsented);
     const [consentGiven, setConsentGiven] = useState(alreadyConsented);
@@ -51,15 +40,14 @@ const CandidateAptitudeRound = () => {
     const [examStarted, setExamStarted] = useState(false);
     const tabAutoSubmitDoneRef = useRef(false);
 
-    // NEW: Proctoring hook
     const {
         isProctoring,
-        hasWebcamPermission,
         error: proctoringError,
         startProctoring,
         stopProctoring
     } = useProctoring(proctoringSessionId, examStarted);
 
+    // --- Computed ---
     const timeLeftMs = useMemo(() => {
         if (!endsAt) return 0;
         const end = new Date(endsAt).getTime();
@@ -74,55 +62,48 @@ const CandidateAptitudeRound = () => {
         return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
     }, [timeLeftMs]);
 
-    // NEW: Handle consent acceptance
+    const currentQuestion = questions[currentQuestionIndex];
+    const isLastQuestion = currentQuestionIndex === questions.length - 1;
+    const isFirstQuestion = currentQuestionIndex === 0;
+
+    // --- Handlers ---
     const handleConsentAccept = async () => {
         setShowConsent(false);
         setConsentGiven(true);
-        // Save consent so DSA round can skip the consent modal
         sessionStorage.setItem('proctoring_consent', 'true');
     };
 
-    // NEW: Handle consent decline
     const handleConsentDecline = () => {
         toast.error('Camera permission is required to take the exam');
         navigate('/applications');
     };
 
-    // NEW: Start exam round (only called after consent)
     const startExamRound = async () => {
         setLoading(true);
         try {
-            // 1. Start the aptitude round (backend creates attempt)
+            // 1. Start Aptitude Round
             const res = await startAptitudeRound(jobId);
             setAttemptId(res.data.attemptId);
-            setDurationMinutes(res.data.durationMinutes);
             setEndsAt(res.data.endsAt);
             setQuestions(res.data.questions || []);
 
-            // 2. Start proctoring session
-            const session = await proctoringService.startSession(
-                jobId,
-                'APTITUDE',
-                res.data.attemptId
-            );
-            setProctoringSessionId(session.id);
-            setExamStarted(true); // Set this BEFORE calling startProctoring
+            // 2. Start Proctoring Session - check for existing session
+            const existingSessionId = sessionStorage.getItem('proctoring_session_id');
+            const session = await proctoringService.startSession(jobId, 'APTITUDE', res.data.attemptId, existingSessionId);
+            const sessionId = session.id;
+            sessionStorage.setItem('proctoring_session_id', sessionId);
+            
+            setProctoringSessionId(sessionId);
+            setExamStarted(true);
 
-            // 3. Request camera permission and start proctoring
-            // Pass sessionId directly to avoid async state update issues
-            const started = await startProctoring(session.id);
-
+            // 3. Request Permission
+            const started = await startProctoring(sessionId);
             if (!started) {
-                // Camera permission denied - block exam
-                toast.error('Camera permission is required. Please enable camera access and try again.');
+                toast.error('Camera permission is required. Please enable camera access.');
                 navigate('/applications');
                 return;
             }
-
-            // 4. Mark exam as started (enables proctoring hook)
-            setExamStarted(true);
-            toast.success('Exam started. Your session is being proctored.');
-
+            toast.success('Exam started. Good luck!');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to start Aptitude round');
             navigate('/applications');
@@ -131,324 +112,331 @@ const CandidateAptitudeRound = () => {
         }
     };
 
-    useEffect(() => {
-        if (!consentGiven) return;
-        if (attemptId) return;
-        startExamRound();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [consentGiven, attemptId]);
-
-    // Redirect after exam completion
-    useEffect(() => {
-        if (!result) return;
-        if (redirected) return;
-        setRedirected(true);
-
-        // NEW: End proctoring session
-        const endProctoringAndRedirect = async () => {
-            // End the proctoring session record on backend
-            if (proctoringSessionId) {
-                try {
-                    await proctoringService.endSession(proctoringSessionId);
-                    console.log('✓ Proctoring session ended');
-                } catch (err) {
-                    console.error('Failed to end proctoring session:', err);
-                }
-            }
-
-            if (!jobId) {
-                stopProctoring(); // Turn off camera - no more rounds
-                sessionStorage.removeItem('proctoring_consent');
-                navigate('/applications', { replace: true });
-                return;
-            }
-
-            try {
-                const r = await getRounds(jobId);
-                const rounds = Array.isArray(r?.data) ? r.data : [];
-                const next = getNextRoundAfter(rounds, 'APTITUDE');
-                if (next) {
-                    stopProctoring();
-                    navigate(getNavigatePathForRound(jobId, next), { replace: true });
-                    return;
-                }
-            } catch {
-                // if rounds api fails, fallback to applications
-            }
-
-            stopProctoring(); // Turn off camera - no more rounds
-            sessionStorage.removeItem('proctoring_consent');
-            navigate('/applications', { replace: true });
-        };
-
-        endProctoringAndRedirect();
-    }, [result, redirected, navigate, jobId, proctoringSessionId, stopProctoring]);
-
-    // Fullscreen attempt
-    useEffect(() => {
-        if (!examStarted) return;
-
-        // Fullscreen removed - can only be triggered by user gesture, not automatically
-    }, [examStarted]);
-
-    // Block back navigation
-    useEffect(() => {
-        if (!attemptId) return;
-        if (result) return;
-
-        const onPop = () => {
-            try {
-                window.history.pushState(null, '', window.location.href);
-            } catch {
-                // ignore
-            }
-        };
-
-        try {
-            window.history.pushState(null, '', window.location.href);
-        } catch {
-            // ignore
-        }
-        window.addEventListener('popstate', onPop);
-        return () => window.removeEventListener('popstate', onPop);
-    }, [attemptId, result]);
-
-    // Timer tick
-    useEffect(() => {
-        if (!endsAt) return;
-
-        const t = setInterval(() => {
-            setNowTick(Date.now());
-        }, 1000);
-
-        return () => clearInterval(t);
-    }, [endsAt]);
-
-    // Auto-submit when timer expires
-    useEffect(() => {
-        if (!attemptId) return;
-        if (!endsAt) return;
-        if (result) return;
-        if (autoSubmitted) return;
-
-        const end = new Date(endsAt).getTime();
-        if (Date.now() <= end) return;
-
-        setAutoSubmitted(true);
-
-        const auto = async () => {
-            try {
-                setSubmitting(true);
-                const answers = Object.entries(selectedByQuestion).map(([questionId, selected]) => ({ questionId, selected }));
-                const res = await submitAptitudeRound({ attemptId, answers });
-                setResult(res.data);
-                toast.success('Aptitude round submitted (time expired)');
-            } catch (err) {
-                toast.error(err.response?.data?.message || 'Auto-submit failed');
-            } finally {
-                setSubmitting(false);
-            }
-        };
-
-        auto();
-    }, [attemptId, endsAt, result, nowTick, autoSubmitted, selectedByQuestion]);
-
-    // Auto-submit immediately if user leaves exam tab/window.
-    useEffect(() => {
-        if (!attemptId || result || autoSubmitted) return;
-        const trigger = async () => {
-            if (tabAutoSubmitDoneRef.current) return;
-            tabAutoSubmitDoneRef.current = true;
-            setAutoSubmitted(true);
-            try {
-                setSubmitting(true);
-                const answers = Object.entries(selectedByQuestion).map(([questionId, selected]) => ({ questionId, selected }));
-                const res = await submitAptitudeRound({ attemptId, answers });
-                setResult(res.data);
-                toast.error('Tab switched - aptitude round auto-submitted');
-            } catch (err) {
-                toast.error(err.response?.data?.message || 'Auto-submit failed');
-            } finally {
-                setSubmitting(false);
-            }
-        };
-
-        const onVisibility = () => {
-            if (document.visibilityState === 'hidden') trigger();
-        };
-        const onBlur = () => trigger();
-        document.addEventListener('visibilitychange', onVisibility);
-        window.addEventListener('blur', onBlur);
-        return () => {
-            document.removeEventListener('visibilitychange', onVisibility);
-            window.removeEventListener('blur', onBlur);
-        };
-    }, [attemptId, result, autoSubmitted, selectedByQuestion]);
-
-    const onSelect = (questionId, letter) => {
-        setSelectedByQuestion((prev) => ({ ...prev, [questionId]: letter }));
-    };
-
-    const onSubmit = async () => {
-        if (!attemptId) return;
+    const submitExam = async (isAuto = false) => {
+        if (!attemptId || submitting || result) return;
 
         setSubmitting(true);
         try {
             const answers = Object.entries(selectedByQuestion).map(([questionId, selected]) => ({ questionId, selected }));
             const res = await submitAptitudeRound({ attemptId, answers });
             setResult(res.data);
-            toast.success('Aptitude round submitted');
+            if (isAuto) {
+                toast('Time expired! Exam auto-submitted.', { icon: '⏰' });
+            } else {
+                toast.success('Exam submitted successfully!');
+            }
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to submit Aptitude round');
-        } finally {
-            setSubmitting(false);
+            toast.error('Failed to submit exam. Please try again.');
+            setSubmitting(false); // Only reset if manual submit failed
         }
     };
 
-    // NEW: Show consent modal first
-    if (showConsent) {
-        return (
-            <ProctoringConsent
-                onAccept={handleConsentAccept}
-                onDecline={handleConsentDecline}
-            />
-        );
-    }
+    // --- Effects ---
+    useEffect(() => {
+        if (consentGiven && !attemptId) startExamRound();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [consentGiven, attemptId]);
 
-    // Show loading while starting exam
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
-                    <p className="text-slate-300">Starting exam and initializing proctoring...</p>
-                </div>
+    // Timer Tick
+    useEffect(() => {
+        if (!endsAt) return;
+        const t = setInterval(() => setNowTick(Date.now()), 1000);
+        return () => clearInterval(t);
+    }, [endsAt]);
+
+    // Auto Submit on Time Expiry
+    useEffect(() => {
+        if (attemptId && endsAt && !result && !autoSubmitted) {
+            const end = new Date(endsAt).getTime();
+            if (Date.now() > end) {
+                setAutoSubmitted(true);
+                submitExam(true);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [attemptId, endsAt, result, nowTick, autoSubmitted]);
+
+    // Tab Switch Auto-Submit
+    useEffect(() => {
+        if (!attemptId || result || autoSubmitted) return;
+
+        const triggerAutoSubmit = () => {
+            if (tabAutoSubmitDoneRef.current) return;
+            tabAutoSubmitDoneRef.current = true;
+            setAutoSubmitted(true);
+            // Stop proctoring and generate summary on tab switch
+            if (proctoringSessionId) {
+                proctoringService.endSession(proctoringSessionId).catch(e => console.error(e));
+                sessionStorage.removeItem('proctoring_session_id');
+            }
+            stopProctoring();
+            submitExam(true);
+            toast.error('Tab switching detected. Exam auto-submitted.');
+        };
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') triggerAutoSubmit();
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('blur', triggerAutoSubmit);
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('blur', triggerAutoSubmit);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [attemptId, result, autoSubmitted, proctoringSessionId]);
+
+    // Redirect after Result
+    useEffect(() => {
+        if (!result || redirected) return;
+        setRedirected(true);
+
+        const endSessionAndRedirect = async () => {
+            // Navigate to next round or applications
+            try {
+                const r = await getRounds(jobId);
+                const rounds = Array.isArray(r?.data) ? r.data : [];
+                const next = getNextRoundAfter(rounds, 'APTITUDE');
+                
+                if (next) {
+                    // Continue to next round - don't stop proctoring
+                    navigate(getNavigatePathForRound(jobId, next), { replace: true });
+                } else {
+                    // No more rounds - stop proctoring
+                    if (proctoringSessionId) {
+                        try { await proctoringService.endSession(proctoringSessionId); } catch (e) {}
+                        sessionStorage.removeItem('proctoring_session_id');
+                    }
+                    stopProctoring();
+                    navigate('/applications', { replace: true });
+                }
+            } catch {
+                // On error, stop proctoring and go to applications
+                if (proctoringSessionId) {
+                    try { await proctoringService.endSession(proctoringSessionId); } catch (e) {}
+                    sessionStorage.removeItem('proctoring_session_id');
+                }
+                stopProctoring();
+                navigate('/applications', { replace: true });
+            }
+        };
+        endSessionAndRedirect();
+    }, [result, redirected, navigate, jobId]);
+
+
+    // --- Render Helpers ---
+    if (showConsent) return <ProctoringConsent onAccept={handleConsentAccept} onDecline={handleConsentDecline} />;
+    
+    if (loading) return (
+        <div className="min-h-screen bg-black flex items-center justify-center text-white">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3"></div>
+            Loading Exam...
+        </div>
+    );
+
+    if (proctoringError) return (
+        <div className="min-h-screen bg-black flex items-center justify-center text-white p-4">
+            <div className="bg-destructive/10 border border-destructive/50 p-6 rounded-lg max-w-md text-center">
+                <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-4" />
+                <h2 className="text-lg font-bold mb-2">Proctoring Error</h2>
+                <p className="text-muted-foreground mb-4">{proctoringError}</p>
+                <button onClick={() => navigate('/applications')} className="bg-secondary hover:bg-secondary/80 text-white px-4 py-2 rounded">Back to Dashboard</button>
             </div>
-        );
-    }
+        </div>
+    );
 
-    // Show error if camera permission denied
-    if (proctoringError) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-                <div className="bg-red-900/20 border border-red-500 rounded-xl p-6 max-w-md">
-                    <h2 className="text-xl font-bold text-red-400 mb-2">Camera Access Required</h2>
-                    <p className="text-slate-300 mb-4">{proctoringError}</p>
-                    <button
-                        onClick={() => navigate('/applications')}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg"
-                    >
-                        Return to Applications
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    if (!attemptId) {
-        return (
-            <div className="p-8 max-w-3xl mx-auto">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <p className="text-slate-300">Unable to start aptitude round.</p>
-                </div>
-            </div>
-        );
-    }
-
-    const ended = timeLeftMs <= 0;
-    const readOnly = !!result || ended;
+    if (!attemptId) return null;
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100">
-            {/* NEW: Recording indicator */}
-            {isProctoring && <RecordingIndicator />}
-            <div className="fixed right-4 top-4 z-40 rounded-xl border border-slate-700 bg-slate-900/90 px-4 py-2 text-right shadow-lg backdrop-blur">
-                <p className="text-[10px] uppercase tracking-widest text-slate-400">Time Left</p>
-                <p className={`text-lg font-semibold ${ended ? 'text-red-400' : 'text-emerald-400'}`}>{timeLeftLabel}</p>
+        <div className="min-h-screen bg-black text-white flex overflow-hidden font-sans">
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+                
+                {/* Header */}
+                <header className="h-16 border-b border-border/20 bg-card/30 backdrop-blur-md flex items-center justify-between px-6 z-10">
+                    <div className="flex items-center gap-4">
+                         <span className="text-sm font-bold uppercase tracking-widest text-muted-foreground/50">APTITUDE ROUND</span>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                         {/* Proctoring Status */}
+                        {isProctoring && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-full animate-pulse">
+                                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                <span className="text-xs font-bold text-red-500 uppercase tracking-wider">REC</span>
+                            </div>
+                        )}
+                        
+                        {/* Timer */}
+                        <div className="flex items-center gap-2 text-foreground font-mono bg-secondary/10 px-3 py-1.5 rounded-md border border-border/20">
+                            <Clock size={16} className="text-primary" />
+                            <span className="text-lg font-bold">{timeLeftLabel}</span>
+                        </div>
+
+                        {/* Submit Button */}
+                        <button 
+                            onClick={() => submitExam()} 
+                            disabled={submitting || result}
+                            className="bg-primary hover:bg-primary/90 text-white px-5 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary/20"
+                        >
+                            {submitting ? 'Submitting...' : 'Submit Exam'}
+                        </button>
+                    </div>
+                </header>
+
+                {/* Question Area */}
+                <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 flex flex-col w-full relative">
+                    {currentQuestion && (
+                        <div className="animate-fade-in flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full">
+                            <div className="mb-4 text-primary font-bold tracking-wider text-xs uppercase flex items-center justify-between">
+                                <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
+                                <span className="text-muted-foreground/50 hidden md:inline-block">Select one option</span>
+                            </div>
+                            
+                            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold font-heading leading-tight mb-8 text-foreground">
+                                {currentQuestion.question}
+                            </h2>
+
+                            <div className="space-y-4 max-w-3xl w-full">
+                                {currentQuestion.options.map((optionText, idx) => {
+                                    const labels = ['A', 'B', 'C', 'D'];
+                                    const optionLabel = labels[idx];
+                                    const isSelected = selectedByQuestion[currentQuestion.id] === optionLabel;
+                                    
+                                    return (
+                                        <button
+                                            key={optionLabel}
+                                            onClick={() => setSelectedByQuestion(prev => ({ ...prev, [currentQuestion.id]: optionLabel }))}
+                                            className={`w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-center group relative overflow-hidden ${
+                                                isSelected 
+                                                ? 'border-primary bg-primary/10 shadow-lg shadow-primary/5' 
+                                                : 'border-border/40 bg-card/40 hover:border-primary/40 hover:bg-card/60'
+                                            }`}
+                                        >
+                                            {/* Selection Indicator Bar */}
+                                            {isSelected && (
+                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+                                            )}
+
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-4 text-sm font-bold transition-colors shrink-0 ${
+                                                isSelected 
+                                                ? 'bg-primary text-white' 
+                                                : 'bg-secondary text-muted-foreground group-hover:text-foreground group-hover:bg-secondary/80'
+                                            }`}>
+                                                {optionLabel}
+                                            </div>
+                                            <span className={`text-base md:text-lg ${isSelected ? 'text-foreground font-medium' : 'text-muted-foreground group-hover:text-foreground'}`}>
+                                                {optionText}
+                                            </span>
+                                            
+                                            {/* Checkmark for selected state */}
+                                            {isSelected && (
+                                                <div className="ml-auto text-primary animate-in fade-in zoom-in duration-200">
+                                                    <CheckCircle2 size={20} />
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </main>
+
+                {/* Footer Navigation */}
+                <footer className="h-20 border-t border-border/20 bg-card/20 backdrop-blur-sm flex items-center justify-between px-6 md:px-12 z-10">
+                    <button
+                        onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                        disabled={isFirstQuestion}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                            isFirstQuestion 
+                            ? 'opacity-30 cursor-not-allowed text-muted-foreground' 
+                            : 'text-foreground hover:bg-secondary/40 hover:pl-3'
+                        }`}
+                    >
+                        <ChevronLeft size={20} />
+                        Previous
+                    </button>
+
+                    <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground font-medium bg-secondary/20 px-3 py-1 rounded-full">
+                        <div className="w-2 h-2 rounded-full bg-primary/60"></div>
+                        <span>{Object.keys(selectedByQuestion).length} answered</span>
+                        <span className="opacity-30">|</span>
+                        <span>{questions.length - Object.keys(selectedByQuestion).length} remaining</span>
+                    </div>
+
+                    <button
+                        onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
+                        disabled={isLastQuestion}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                            isLastQuestion 
+                            ? 'opacity-30 cursor-not-allowed text-muted-foreground' 
+                            : 'text-foreground hover:bg-secondary/40 hover:pr-3'
+                        }`}
+                    >
+                        Next
+                        <ChevronRight size={20} />
+                    </button>
+                </footer>
             </div>
 
-            <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold">Aptitude Round</h1>
-                        <p className="text-sm text-slate-400">Attempt: {attemptId}</p>
-                        {durationMinutes != null && <p className="text-sm text-slate-400">Duration: {durationMinutes} minutes</p>}
-                        {/* NEW: Proctoring status */}
-                        {isProctoring && (
-                            <p className="text-xs text-green-400 mt-1">
-                                ● Proctoring Active
-                            </p>
-                        )}
+            {/* Right Sidebar - Question Palette */}
+            <aside className="w-80 border-l border-border/20 bg-card/10 backdrop-blur-sm p-6 hidden lg:flex flex-col h-screen sticky top-0">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Question Palette</h3>
+                    <div className="text-[10px] bg-secondary/30 px-2 py-0.5 rounded text-muted-foreground font-mono">
+                        {currentQuestionIndex + 1}/{questions.length}
                     </div>
-
-                    <div />
                 </div>
-
-                {result && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                        <p className="text-slate-300">
-                            Status: <span className="text-white font-semibold">{result.status}</span>
-                        </p>
-                        <p className="text-slate-300">
-                            Score: <span className="text-white font-semibold">{result.score}</span>
-                        </p>
-                    </div>
-                )}
-
-                <div className="space-y-4">
+                
+                <div className="grid grid-cols-5 gap-2.5 content-start overflow-y-auto pr-1 custom-scrollbar pb-4">
                     {questions.map((q, idx) => {
-                        const selected = selectedByQuestion[q.id];
-                        const labels = ['A', 'B', 'C', 'D'];
+                        const isAnswered = !!selectedByQuestion[q.id];
+                        const isCurrent = currentQuestionIndex === idx;
 
                         return (
-                            <div key={q.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                                <div className="flex items-start gap-3">
-                                    <div className="text-slate-500 font-semibold">{idx + 1}.</div>
-                                    <div className="flex-1">
-                                        <p className="text-white font-medium">{q.question}</p>
-
-                                        <div className="mt-4 grid gap-2">
-                                            {q.options.map((opt, i) => {
-                                                const letter = labels[i];
-                                                const active = selected === letter;
-
-                                                return (
-                                                    <button
-                                                        key={letter}
-                                                        type="button"
-                                                        disabled={readOnly}
-                                                        onClick={() => onSelect(q.id, letter)}
-                                                        className={`text-left px-4 py-3 rounded-lg border transition-colors ${active
-                                                            ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                                                            : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-slate-700'
-                                                            } ${readOnly ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                                    >
-                                                        <span className="font-semibold mr-3 text-slate-400">{letter}</span>
-                                                        {opt}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <button
+                                key={q.id}
+                                onClick={() => setCurrentQuestionIndex(idx)}
+                                className={`aspect-square rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-200 ${
+                                    isCurrent 
+                                    ? 'bg-primary text-white shadow-lg shadow-primary/25 scale-110 ring-2 ring-primary/50 relative z-10' 
+                                    : isAnswered 
+                                        ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' 
+                                        : 'bg-secondary/30 text-muted-foreground border border-border/20 hover:bg-secondary/50 hover:text-foreground'
+                                }`}
+                            >
+                                {idx + 1}
+                            </button>
                         );
                     })}
                 </div>
 
-                <div className="flex items-center justify-between">
-                    <button
-                        disabled={submitting || readOnly}
-                        onClick={onSubmit}
-                        className={`px-5 py-2 rounded-lg font-semibold ${submitting || readOnly
-                            ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
-                            : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                            }`}
-                    >
-                        {submitting ? 'Submitting...' : 'Submit'}
-                    </button>
+                <div className="mt-auto pt-6 border-t border-border/20 space-y-3">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded bg-primary shadow-sm shadow-primary/50"></div>
+                            Current
+                        </span>
+                        <span>1</span>
+                    </div>
+                     <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/30"></div>
+                            Answered
+                        </span>
+                         <span>{Object.keys(selectedByQuestion).length}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded bg-secondary/30 border border-border/20"></div>
+                            Unanswered
+                        </span>
+                         <span>{questions.length - Object.keys(selectedByQuestion).length}</span>
+                    </div>
                 </div>
-            </div>
+            </aside>
         </div>
     );
 };

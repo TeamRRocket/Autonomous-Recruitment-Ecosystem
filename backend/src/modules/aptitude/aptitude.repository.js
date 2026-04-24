@@ -107,8 +107,8 @@ class AptitudeRepository {
     return updated;
   }
 
-  async computeScore(attemptId) {
-    const res = await pool.query(
+  async computeScore(client, attemptId) {
+    const res = await client.query(
       `SELECT COUNT(*)::int AS total,
               SUM(CASE WHEN r.selected_option = q.correct_option THEN 1 ELSE 0 END)::int AS correct
        FROM candidate_aptitude_responses r

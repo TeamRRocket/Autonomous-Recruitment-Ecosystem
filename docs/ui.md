@@ -1,411 +1,197 @@
-# HireFlow UI Design System Reference
+# HireFlow — UI Design System Documentation
 
-Complete design system documentation for replicating the HireFlow dark-themed recruitment platform UI.
+## Overview
 
----
-
-## 1. Theme Mode
-
-- **Mode**: Dark only (no light mode)
-- **HTML class**: `<html class="dark">`
-- **CSS Strategy**: CSS custom properties (HSL format without `hsl()` wrapper), consumed via `hsl(var(--token))` in Tailwind config
+HireFlow uses a **dark-first, professional** design system built on React + Tailwind CSS + shadcn/ui. The aesthetic is clean, modern, and recruiter-grade — optimized for data-dense interfaces like dashboards, tables, and assessment engines.
 
 ---
 
-## 2. Color Palette
+## Typography
 
-All values are HSL (hue saturation% lightness%) without the `hsl()` function wrapper.
+| Role       | Font Family          | Usage                              |
+|------------|----------------------|------------------------------------|
+| **Heading** | `Plus Jakarta Sans`  | All `h1`–`h6`, page titles, cards  |
+| **Body**    | `Inter`              | Paragraphs, labels, form inputs    |
+| **Mono**    | `JetBrains Mono`     | Code editor, scores, technical IDs |
 
-### Core Colors
+### Tailwind Classes
 
-| Token                    | HSL Value          | Hex Approx   | Usage                              |
-|--------------------------|--------------------|--------------|------------------------------------|
-| `--background`           | `240 6% 3.9%`     | `#0a0a0b`    | Page background                    |
-| `--foreground`           | `0 0% 98%`        | `#fafafa`    | Primary text                       |
-| `--card`                 | `240 5% 10%`      | `#181819`    | Card/panel backgrounds             |
-| `--card-foreground`      | `0 0% 98%`        | `#fafafa`    | Card text                          |
-| `--popover`              | `240 5% 10%`      | `#181819`    | Popover/dropdown backgrounds       |
-| `--popover-foreground`   | `0 0% 98%`        | `#fafafa`    | Popover text                       |
+```
+font-heading   → Plus Jakarta Sans
+font-body      → Inter
+font-mono      → JetBrains Mono
+```
 
-### Brand / Action Colors
-
-| Token                      | HSL Value          | Hex Approx   | Usage                            |
-|----------------------------|--------------------|--------------|----------------------------------|
-| `--primary`                | `217 91% 60%`     | `#3b82f6`    | Primary buttons, links, active states |
-| `--primary-foreground`     | `0 0% 100%`       | `#ffffff`    | Text on primary                  |
-| `--secondary`              | `240 4% 16%`      | `#272729`    | Secondary buttons, subtle backgrounds |
-| `--secondary-foreground`   | `0 0% 98%`        | `#fafafa`    | Text on secondary                |
-| `--accent`                 | `240 4% 16%`      | `#272729`    | Hover backgrounds, accent areas  |
-| `--accent-foreground`      | `0 0% 98%`        | `#fafafa`    | Text on accent                   |
-
-### Semantic Colors
-
-| Token                      | HSL Value          | Hex Approx   | Usage                            |
-|----------------------------|--------------------|--------------|----------------------------------|
-| `--destructive`            | `0 84% 60%`       | `#ef4444`    | Delete, error, danger            |
-| `--destructive-foreground` | `0 0% 98%`        | `#fafafa`    | Text on destructive              |
-| `--success`                | `160 84% 39%`     | `#10b981`    | Success states, passed, active   |
-| `--success-foreground`     | `0 0% 100%`       | `#ffffff`    | Text on success                  |
-| `--warning`                | `38 92% 50%`      | `#f59e0b`    | Warnings, medium difficulty      |
-| `--warning-foreground`     | `0 0% 0%`         | `#000000`    | Text on warning                  |
-
-### Muted / Utility Colors
-
-| Token                    | HSL Value          | Hex Approx   | Usage                            |
-|--------------------------|--------------------|--------------|----------------------------------|
-| `--muted`                | `240 4% 16%`      | `#272729`    | Muted backgrounds                |
-| `--muted-foreground`     | `240 5% 65%`      | `#a1a1a6`    | Secondary text, labels, captions |
-| `--border`               | `240 4% 16%`      | `#272729`    | Borders, dividers                |
-| `--input`                | `240 4% 16%`      | `#272729`    | Input field borders              |
-| `--ring`                 | `217 91% 60%`     | `#3b82f6`    | Focus ring                       |
-
-### Sidebar Colors
-
-| Token                          | HSL Value          | Usage                         |
-|--------------------------------|--------------------|-------------------------------|
-| `--sidebar-background`         | `240 6% 3.9%`     | Sidebar background            |
-| `--sidebar-foreground`         | `240 5% 65%`      | Sidebar text (inactive links) |
-| `--sidebar-primary`            | `217 91% 60%`     | Sidebar active link highlight |
-| `--sidebar-primary-foreground` | `0 0% 100%`       | Active link text              |
-| `--sidebar-accent`             | `240 4% 16%`      | Sidebar hover/active bg       |
-| `--sidebar-accent-foreground`  | `0 0% 98%`        | Sidebar hover text            |
-| `--sidebar-border`             | `240 4% 16%`      | Sidebar border                |
-| `--sidebar-ring`               | `217 91% 60%`     | Sidebar focus ring            |
-
-### Special
-
-| Token                   | HSL Value     | Usage                    |
-|-------------------------|---------------|--------------------------|
-| `--editor-background`   | `0 0% 0%`    | Code editor background   |
+Fonts are loaded via Google Fonts in `index.html` (weights 400–700).
 
 ---
 
-## 3. Typography
+## Color Palette
 
-### Font Families
+All colors are defined as **HSL values** in CSS custom properties (`:root`) and consumed via Tailwind semantic tokens. No raw color classes are used in components.
 
-| Role      | Font                   | CSS Variable         | Tailwind Class  | Google Fonts URL |
-|-----------|------------------------|----------------------|-----------------|------------------|
-| Headings  | Plus Jakarta Sans      | `--font-heading`     | `font-heading`  | `Plus+Jakarta+Sans:wght@400;500;600;700;800` |
-| Body      | Inter                  | `--font-body`        | `font-body`     | `Inter:wght@300;400;500;600;700` |
-| Monospace | JetBrains Mono         | `--font-mono`        | `font-mono`     | `JetBrains+Mono:wght@400;500;600` |
+### Core Tokens
 
-### Google Fonts Import
+| Token                    | HSL Value            | Hex (approx.) | Usage                        |
+|--------------------------|----------------------|---------------|------------------------------|
+| `--background`           | `240 6% 3.9%`       | `#09090b`     | Page background              |
+| `--foreground`           | `0 0% 98%`          | `#fafafa`     | Primary text                 |
+| `--card`                 | `240 5% 10%`        | `#18181b`     | Card / panel backgrounds     |
+| `--card-foreground`      | `0 0% 98%`          | `#fafafa`     | Card text                    |
+| `--primary`              | `217 91% 60%`       | `#3b82f6`     | Buttons, links, active items |
+| `--primary-foreground`   | `0 0% 100%`         | `#ffffff`     | Text on primary              |
+| `--secondary`            | `240 4% 16%`        | `#27272a`     | Secondary buttons, surfaces  |
+| `--secondary-foreground` | `0 0% 98%`          | `#fafafa`     | Text on secondary            |
+| `--muted`                | `240 4% 16%`        | `#27272a`     | Subtle backgrounds           |
+| `--muted-foreground`     | `240 5% 65%`        | `#a1a1aa`     | Placeholder / helper text    |
+| `--accent`               | `240 4% 16%`        | `#27272a`     | Hover states, sidebar active |
+| `--accent-foreground`    | `0 0% 98%`          | `#fafafa`     | Text on accent               |
+| `--destructive`          | `0 84% 60%`         | `#ef4444`     | Delete, reject, errors       |
+| `--destructive-foreground` | `0 0% 98%`        | `#fafafa`     | Text on destructive          |
+| `--success`              | `160 84% 39%`       | `#10b981`     | Passed, approved, success    |
+| `--success-foreground`   | `0 0% 100%`         | `#ffffff`     | Text on success              |
+| `--warning`              | `38 92% 50%`        | `#f59e0b`     | Pending, caution states      |
+| `--warning-foreground`   | `0 0% 0%`           | `#000000`     | Text on warning              |
+| `--border`               | `240 4% 16%`        | `#27272a`     | All borders                  |
+| `--input`                | `240 4% 16%`        | `#27272a`     | Input field borders          |
+| `--ring`                 | `217 91% 60%`       | `#3b82f6`     | Focus rings                  |
+
+### Sidebar Tokens
+
+| Token                           | HSL Value        | Usage                |
+|---------------------------------|------------------|----------------------|
+| `--sidebar-background`          | `240 6% 3.9%`   | Sidebar background   |
+| `--sidebar-foreground`          | `240 5% 65%`    | Sidebar text         |
+| `--sidebar-primary`             | `217 91% 60%`   | Active nav item      |
+| `--sidebar-primary-foreground`  | `0 0% 100%`     | Active nav text      |
+| `--sidebar-accent`              | `240 4% 16%`    | Hover state          |
+| `--sidebar-accent-foreground`   | `0 0% 98%`      | Hover text           |
+| `--sidebar-border`              | `240 4% 16%`    | Sidebar dividers     |
+
+### Special Tokens
+
+| Token                  | Value           | Usage            |
+|------------------------|-----------------|------------------|
+| `--editor-background`  | `0 0% 0%`      | Code editor bg   |
+| `--radius`             | `0.5rem` (8px)  | Base border radius |
+
+---
+
+## Border Radius
+
+Derived from `--radius: 0.5rem`:
+
+| Class         | Value                          | Pixels |
+|---------------|--------------------------------|--------|
+| `rounded-lg`  | `var(--radius)` = `0.5rem`     | 8px    |
+| `rounded-md`  | `calc(var(--radius) - 2px)`    | 6px    |
+| `rounded-sm`  | `calc(var(--radius) - 4px)`    | 4px    |
+
+---
+
+## Animations & Motion
+
+### Keyframes
+
+| Name              | Effect                                     | Duration | Easing   |
+|-------------------|----------------------------------------------|----------|----------|
+| `fade-in`         | Opacity 0→1 + translateY(4px→0)              | 200ms    | ease-out |
+| `accordion-down`  | Height 0 → content height                   | 200ms    | ease-out |
+| `accordion-up`    | Height content → 0                           | 200ms    | ease-out |
+
+### Usage
 
 ```html
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<main className="animate-fade-in">  <!-- Page content entrance -->
 ```
 
-### Typography Scale (Tailwind classes used)
+### Transition Defaults
 
-| Element             | Classes                                          |
-|---------------------|--------------------------------------------------|
-| Page title (h1)     | `font-heading text-2xl font-bold text-foreground` |
-| Section heading     | `font-heading text-base font-semibold text-foreground` |
-| Subsection label    | `text-xs uppercase tracking-wider font-semibold text-foreground` |
-| Body text           | `text-sm text-muted-foreground leading-relaxed`  |
-| Small label/caption | `text-xs text-muted-foreground`                   |
-| Mono/code text      | `font-mono text-xs` or `font-mono text-sm`        |
-| Badge text          | `text-xs font-medium`                              |
+All interactive elements use Tailwind's `transition-colors` for hover/focus state changes. No spring physics or complex motion — the system favors **snappy, subtle transitions** for a professional feel.
 
 ---
 
-## 4. Spacing & Layout
+## Spacing & Layout
 
-### Border Radius
-
-| Token  | Value                        | Tailwind    |
-|--------|------------------------------|-------------|
-| `lg`   | `var(--radius)` = `0.5rem`   | `rounded-lg` |
-| `md`   | `calc(var(--radius) - 2px)`  | `rounded-md` |
-| `sm`   | `calc(var(--radius) - 4px)`  | `rounded-sm` |
-| `full` | `9999px`                     | `rounded-full` |
-
-### Container
-
-- Max width: `1400px` at `2xl` breakpoint
-- Centered with `padding: 2rem`
-
-### Common Spacing Patterns
-
-| Context            | Padding/Gap        |
-|--------------------|--------------------|
-| Page content       | `p-6`              |
-| Card padding       | `p-4` to `p-6`     |
-| Sidebar width      | `w-60` (240px)     |
-| Header height      | `h-14` (56px)      |
-| Button gaps        | `gap-2` to `gap-3` |
-| Form field spacing  | `space-y-4`        |
-| Section spacing     | `space-y-6`        |
+| Element            | Value         | Notes                        |
+|--------------------|---------------|------------------------------|
+| Sidebar width      | `w-60` (240px)| Fixed left sidebar           |
+| Header height      | `h-14` (56px) | Fixed top header             |
+| Page padding       | `p-6` (24px)  | Main content area            |
+| Container max      | `1400px`      | `2xl` breakpoint             |
+| Container padding  | `2rem` (32px) | Horizontal padding           |
+| Card gap           | `gap-4`–`gap-6` | Between grid items        |
 
 ---
 
-## 5. Component Patterns
+## Component Library
 
-### Buttons
+Built on **shadcn/ui** (Radix primitives + Tailwind styling).
 
-```
-Primary:    bg-primary text-primary-foreground hover:bg-primary/90
-Secondary:  bg-secondary text-secondary-foreground hover:bg-secondary/80
-Outline:    border border-input bg-background hover:bg-accent hover:text-accent-foreground
-Ghost:      hover:bg-accent hover:text-accent-foreground
-Destructive: bg-destructive text-destructive-foreground hover:bg-destructive/90
-Link:       text-primary underline-offset-4 hover:underline
-```
+### Button Variants
 
-**Sizes:**
-- Default: `h-10 px-4 py-2`
-- Small: `h-9 px-3 rounded-md`
-- Large: `h-11 px-8 rounded-md`
-- Icon: `h-10 w-10`
+| Variant       | Style                                       |
+|---------------|---------------------------------------------|
+| `default`     | `bg-primary text-primary-foreground`         |
+| `destructive` | `bg-destructive text-destructive-foreground` |
+| `outline`     | `border-input bg-background`                 |
+| `secondary`   | `bg-secondary text-secondary-foreground`     |
+| `ghost`       | Transparent, hover: `bg-accent`              |
+| `link`        | `text-primary` with underline on hover       |
 
-### Cards
+### Button Sizes
 
-```
-Background: bg-card (hsl(240 5% 10%))
-Border:     border border-border
-Radius:     rounded-lg
-Padding:    p-4 to p-6
-```
+| Size      | Height | Padding    |
+|-----------|--------|------------|
+| `default` | 40px   | `px-4 py-2`|
+| `sm`      | 36px   | `px-3`     |
+| `lg`      | 44px   | `px-8`     |
+| `icon`    | 40×40  | —          |
 
-### Inputs
+### Status Badges
 
-```
-Height:     h-10
-Background: bg-background
-Border:     border border-input
-Radius:     rounded-md
-Focus:      ring-2 ring-ring ring-offset-2 ring-offset-background
-Font size:  text-base (mobile) / text-sm (md+)
-Placeholder: text-muted-foreground
-```
+Color-coded using semantic tokens:
 
-### Badges / Status Chips
-
-```
-Difficulty Easy:   bg-success/10 text-success border-success/20
-Difficulty Medium: bg-warning/10 text-warning border-warning/20
-Difficulty Hard:   bg-destructive/10 text-destructive border-destructive/20
-Status Active:     bg-success/10 text-success
-Status Pending:    bg-warning/10 text-warning
-Status Rejected:   bg-destructive/10 text-destructive
-General:           bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-xs
-```
-
-### Sidebar
-
-```
-Width:      w-60 (240px)
-Position:   fixed left-0 top-0 h-screen
-Background: bg-sidebar (--sidebar-background)
-Border:     border-r border-border
-Nav links:
-  - Inactive: text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground
-  - Active:   bg-sidebar-accent text-foreground
-  - Shape:    rounded-md px-3 py-2 text-sm font-medium
-  - Icons:    h-4 w-4, gap-3 from text
-```
-
-### Header
-
-```
-Height:     h-14 (56px)
-Background: bg-background
-Border:     border-b border-border
-Content:    px-6, flex items-center justify-between
-```
-
-### Tables
-
-```
-Header row: bg-secondary/50 text-muted-foreground text-xs uppercase
-Body rows:  border-b border-border hover:bg-secondary/30
-Cell padding: px-4 py-3
-Text:       text-sm text-foreground (values), text-muted-foreground (secondary)
-```
+| Status       | Color Token    | Example             |
+|--------------|----------------|----------------------|
+| Published    | `success`      | Green badge          |
+| Pending      | `warning`      | Amber badge          |
+| Rejected     | `destructive`  | Red badge            |
+| Draft        | `secondary`    | Gray badge           |
+| Shortlisted  | `primary`      | Blue badge           |
 
 ---
 
-## 6. Motion & Animations
+## Iconography
 
-### Keyframes (in tailwind.config.ts)
-
-```js
-keyframes: {
-  "accordion-down": {
-    from: { height: "0" },
-    to: { height: "var(--radix-accordion-content-height)" },
-  },
-  "accordion-up": {
-    from: { height: "var(--radix-accordion-content-height)" },
-    to: { height: "0" },
-  },
-  "fade-in": {
-    from: { opacity: "0", transform: "translateY(4px)" },
-    to: { opacity: "1", transform: "translateY(0)" },
-  },
-}
-```
-
-### Animation Classes
-
-| Class                | Duration | Easing   | Effect                         |
-|----------------------|----------|----------|--------------------------------|
-| `animate-fade-in`    | 0.2s     | ease-out | Fade in + slide up 4px         |
-| `animate-accordion-down` | 0.2s | ease-out | Expand accordion content       |
-| `animate-accordion-up`   | 0.2s | ease-out | Collapse accordion content     |
-
-### Transition Patterns
-
-- Buttons/links: `transition-colors` (color transitions on hover)
-- Interactive elements: `transition-all duration-200`
-- Page content entrance: `animate-fade-in` on `<main>`
+- **Library:** Lucide React (`lucide-react`)
+- **Size:** Default `size-4` (16px) inside buttons, `size-5` (20px) in nav
+- **Style:** Stroke-based, 2px stroke width, consistent with the minimal aesthetic
 
 ---
 
-## 7. Icon System
+## Shadows & Depth
 
-- **Library**: Lucide React (`lucide-react`)
-- **Default size**: `h-4 w-4` (16px)
-- **Large icons**: `h-5 w-5` (20px)
-- **Color**: Inherits from text color, often `text-muted-foreground`
+The design is predominantly **flat** with subtle depth cues:
 
-### Commonly Used Icons
-
-```
-LayoutDashboard, Search, FileText, Sparkles, User, PlusCircle,
-Users, BarChart3, Clock, Play, Send, Maximize2, Minus, Plus,
-ChevronLeft, ChevronRight, Upload, Eye, X, Check, AlertCircle,
-LogOut, Settings, Briefcase, MapPin, Calendar, Star, Target
-```
+- Cards use `bg-card` against `bg-background` for contrast (no box-shadow by default)
+- Focus states use `ring-2 ring-ring ring-offset-2 ring-offset-background`
+- Popover/dropdown menus inherit shadcn defaults with slight elevation
 
 ---
 
-## 8. UI Component Library
+## Dark Mode
 
-- **Base**: shadcn/ui (Radix UI primitives + Tailwind styling)
-- **Key components used**: Button, Badge, Card, Input, Select, Textarea, Dialog, Tabs, Table, Separator, Progress, Checkbox, RadioGroup, ScrollArea, Sheet, Tooltip, Toast/Sonner
-- **Resizable panels**: `react-resizable-panels`
-- **Charts**: `recharts`
-- **Forms**: `react-hook-form` + `zod` + `@hookform/resolvers`
-- **Routing**: `react-router-dom` v6
+The entire app runs in **dark mode only** — there is no light theme toggle. All tokens in `:root` are dark-optimized. The `darkMode: ["class"]` config is present in Tailwind but unused; the base palette _is_ the dark theme.
 
 ---
 
-## 9. Layout Architecture
+## File Reference
 
-### Dashboard Layout (most pages)
-
-```
-┌──────────────────────────────────────────────┐
-│ Sidebar (w-60, fixed)  │  Header (h-14)      │
-│                        │──────────────────────│
-│  Logo                  │  Main Content (p-6)  │
-│  Nav Links             │  animate-fade-in     │
-│  ...                   │                      │
-│  User Avatar           │                      │
-└──────────────────────────────────────────────┘
-Main content: ml-60 (offset for sidebar)
-```
-
-### Full-Screen Exam Layout (assessment pages)
-
-```
-┌──────────────────────────────────────────────┐
-│ Exam Header (border-b, px-4 py-2)            │
-│  Problem tabs | Timer | Submit All           │
-├──────────────────┬───────────────────────────│
-│ Problem Panel    │ Code Editor Panel          │
-│ (scrollable)     │ (textarea, font-mono)      │
-│                  │                            │
-│                  ├───────────────────────────│
-│                  │ Action Bar (Run/Submit)    │
-│                  │ Results Panel              │
-└──────────────────┴───────────────────────────┘
-Split: resizable, default 50/50
-```
-
-### Auth Pages (no sidebar/header)
-
-```
-Centered card on dark background
-Max width: max-w-md
-Card: bg-card border rounded-lg p-6-8
-```
-
----
-
-## 10. Dark Theme Global Styles
-
-```css
-/* Applied to all elements */
-* { border-color: hsl(var(--border)); }
-
-/* Body */
-body {
-  background: hsl(var(--background));   /* near-black */
-  color: hsl(var(--foreground));        /* near-white */
-  font-family: 'Inter', sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* All headings */
-h1-h6 { font-family: 'Plus Jakarta Sans', sans-serif; }
-```
-
----
-
-## 11. Tailwind Config Essentials
-
-```js
-// tailwind.config.ts
-{
-  darkMode: ["class"],
-  content: ["./src/**/*.{ts,tsx}"],
-  theme: {
-    extend: {
-      fontFamily: {
-        heading: ['Plus Jakarta Sans', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-      },
-      colors: {
-        // All use hsl(var(--token)) pattern
-        border, input, ring, background, foreground,
-        primary: { DEFAULT, foreground },
-        secondary: { DEFAULT, foreground },
-        destructive: { DEFAULT, foreground },
-        success: { DEFAULT, foreground },
-        warning: { DEFAULT, foreground },
-        muted: { DEFAULT, foreground },
-        accent: { DEFAULT, foreground },
-        popover: { DEFAULT, foreground },
-        card: { DEFAULT, foreground },
-        sidebar: { DEFAULT, foreground, primary, "primary-foreground", accent, "accent-foreground", border, ring },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-    },
-  },
-  plugins: [require("tailwindcss-animate")],
-}
-```
-
----
-
-## 12. Key Design Principles
-
-1. **Near-black backgrounds** — Page bg is `3.9% lightness`, cards are `10%`, creating subtle depth
-2. **Blue as the only accent** — `hsl(217 91% 60%)` for all interactive/primary elements
-3. **Muted secondary text** — `65% lightness` gray for non-critical information
-4. **Minimal borders** — Same color as secondary bg (`16% lightness`), barely visible
-5. **Monospace for data** — JetBrains Mono for scores, timers, code, and technical data
-6. **Semantic color coding** — Green=success, Yellow=warning, Red=destructive consistently
-7. **Opacity-based badges** — `bg-color/10 text-color border-color/20` pattern for soft badges
-8. **No shadows** — Depth via background color layering, not box-shadows
-9. **Compact UI** — Small text sizes (`text-xs`, `text-sm`), tight padding for information density
+| File                    | Purpose                          |
+|-------------------------|----------------------------------|
+| `src/index.css`         | CSS custom properties (tokens)   |
+| `tailwind.config.ts`    | Tailwind theme extension         |
+| `components.json`       | shadcn/ui configuration          |
+| `index.html`            | Google Fonts imports             |
+| `src/components/ui/*`   | shadcn/ui primitives             |

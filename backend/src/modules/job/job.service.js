@@ -209,10 +209,12 @@ export const getJobById = async (jobId) => {
 
 export const getJobsByRecruiter = async (recruiterId) => {
     const result = await pool.query(
-        `SELECT j.*, o.name as organization_name
+        `SELECT j.*, o.name as organization_name, COUNT(a.id) as application_count
      FROM jobs j
      LEFT JOIN organizations o ON j.organization_id = o.id
+     LEFT JOIN applications a ON j.id = a.job_id
      WHERE j.recruiter_id = $1 
+     GROUP BY j.id, o.name
      ORDER BY j.created_at DESC`,
         [recruiterId]
     );
@@ -539,7 +541,7 @@ export const getJobScores = async (jobId) => {
         let t = technicalRaw;
         if (t != null && t <= 10) t = t * 10;
         const parts = [resumeScore, a, d, t].filter((x) => x != null);
-        const total_score = parts.length > 0 ? Math.round(parts.reduce((acc, v) => acc + v, 0) * 10) / 10 : null;
+        const total_score = parts.length > 0 ? Math.round((parts.reduce((acc, v) => acc + v, 0) / parts.length) * 10) / 10 : null;
 
         return {
             application: {

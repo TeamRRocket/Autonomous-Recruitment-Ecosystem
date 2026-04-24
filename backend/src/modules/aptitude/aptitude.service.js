@@ -104,7 +104,7 @@ class AptitudeService {
           await client.query('BEGIN');
           const locked = await aptitudeRepository.getAttemptByIdForUpdate(client, existing.id);
           if (locked && locked.status === 'started') {
-            const { score } = await aptitudeRepository.computeScore(locked.id);
+            const { score } = await aptitudeRepository.computeScore(client, locked.id);
             await aptitudeRepository.finalizeAttempt(client, { attemptId: locked.id, status: 'expired', score });
           }
           await client.query('COMMIT');
@@ -191,7 +191,7 @@ class AptitudeService {
           await client.query('BEGIN');
           const locked = await aptitudeRepository.getAttemptByIdForUpdate(client, attempt.id);
           if (locked && locked.status === 'started') {
-            const { score } = await aptitudeRepository.computeScore(locked.id);
+            const { score } = await aptitudeRepository.computeScore(client, locked.id);
             await aptitudeRepository.finalizeAttempt(client, { attemptId: locked.id, status: 'expired', score });
           }
           await client.query('COMMIT');
@@ -259,7 +259,8 @@ class AptitudeService {
         throw new AppError('One or more questions are not part of this attempt', 400);
       }
 
-      const { score } = await aptitudeRepository.computeScore(attempt.id);
+      const scoreResult = await aptitudeRepository.computeScore(client, attempt.id);
+      const score = scoreResult.score;
       const status = ended ? 'expired' : 'submitted';
 
       const finalized = await aptitudeRepository.finalizeAttempt(client, { attemptId: attempt.id, status, score });

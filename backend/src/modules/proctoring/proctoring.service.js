@@ -6,9 +6,9 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 class ProctoringService {
     /**
-     * Start a new proctoring session
+     * Start a new proctoring session or reuse existing
      */
-    async startSession(userId, jobId, roundType, attemptId) {
+    async startSession(userId, jobId, roundType, attemptId, existingSessionId = null) {
         try {
             // Get candidate profile
             const candidateQuery = `
@@ -23,7 +23,16 @@ class ProctoringService {
 
             const candidateId = candidateResult.rows[0].id;
 
-            // Check if session already exists
+            // If existing session ID provided, check if it's valid and active
+            if (existingSessionId) {
+                const existingSession = await proctoringRepository.getSessionById(existingSessionId);
+                if (existingSession && existingSession.status === 'ACTIVE') {
+                    console.log(`✓ Reusing existing proctoring session: ${existingSessionId}`);
+                    return existingSession;
+                }
+            }
+
+            // Check if session already exists for this attempt
             const existingSession = await proctoringRepository.getSessionByAttempt(attemptId, roundType);
             if (existingSession) {
                 return existingSession;
@@ -102,7 +111,7 @@ class ProctoringService {
     }
 
     /**
-     * End proctoring session and trigger async LLM evaluation
+     * End proctoring session and trigger LLM evaluation (synchronous)
      */
     async endSession(sessionId) {
         try {
@@ -118,10 +127,14 @@ class ProctoringService {
             // Aggregate events (synchronous)
             await this.aggregateEvents(sessionId);
 
-            // Trigger async LLM evaluation (fire and forget)
-            this.evaluateRiskWithLLM(sessionId).catch(err => {
-                console.error('LLM evaluation failed (async):', err.message);
-            });
+            // Trigger LLM evaluation (synchronous - wait for completion)
+            try {
+                await this.evaluateRiskWithLLM(sessionId);
+            } catch (llmErr) {
+                console.error('LLM evaluation failed, using fallback:', llmErr.message);
+                // Fallback to rule-based risk calculation
+                await this.calculateFallbackRiskScore(sessionId);
+            }
 
             return session;
         } catch (error) {
@@ -267,7 +280,7 @@ class ProctoringService {
         riskScore += summary.total_tab_switch * 8;
         riskScore += summary.total_window_blur * 3;
         riskScore += summary.total_copy_paste * 15;
-        riskScore += summary.total_phone_detected * 20;
+        riskScore += summary.total_phone_detected * 40;
 
         riskScore = Math.min(100, riskScore);
 
@@ -365,7 +378,7 @@ class ProctoringService {
                 concerns.push(`${combined.total_copy_paste} copy/paste attempts`);
             }
             if (combined.total_phone_detected > 0) {
-                overallRiskScore += combined.total_phone_detected * 25;
+                overallRiskScore += combined.total_phone_detected * 50;
                 concerns.push(`phone detected ${combined.total_phone_detected} times`);
             }
 

@@ -1,0 +1,76 @@
+--- frontend/src/hooks/useProctoring.js
++++ frontend/src/hooks/useProctoring.js
+@@ -5,2 +5,5 @@
+ const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
+ 
++// Global singletons to persist across rounds
++let globalStream = null;
++let globalVideo = null;
++
+ /**
+@@ -15,4 +18,2 @@
+ 
+-     const streamRef = useRef(null);
+      const wsRef = useRef(null);
+-     const videoRef = useRef(null);
+      const captureIntervalRef = useRef(null);
+@@ -25,12 +26,12 @@
+              const stream = await navigator.mediaDevices.getUserMedia({
+                  video: {
+                      width: { ideal: 640 },
+                      height: { ideal: 480 },
+                      facingMode: 'user'
+                  },
+                  audio: false
+              });
+ 
+-             streamRef.current = stream;
++             globalStream = stream;
+              setHasWebcamPermission(true);
+              setError(null);
+ 
+              // Create hidden video element for frame capture
+-             if (!videoRef.current) {
+-                 videoRef.current = document.createElement('video');
+-                 videoRef.current.srcObject = stream;
+-                 videoRef.current.play();
++             if (!globalVideo) {
++                 globalVideo = document.createElement('video');
++                 globalVideo.srcObject = stream;
++                 globalVideo.play();
+              }
+@@ -140,7 +141,7 @@
+              // Draw video frame to canvas
+-             if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) return;
++             if (globalVideo.videoWidth === 0 || globalVideo.videoHeight === 0) return;
+              
+-             canvas.width = videoRef.current.videoWidth;
+-             canvas.height = videoRef.current.videoHeight;
+-             context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
++             canvas.width = globalVideo.videoWidth;
++             canvas.height = globalVideo.videoHeight;
++             context.drawImage(globalVideo, 0, 0, canvas.width, canvas.height);
+ 
+@@ -188,3 +189,3 @@
+          // Initialize webcam if not already running
+-         if (!streamRef.current) {
++         if (!globalStream) {
+              const hasPermission = await requestWebcamPermission();
+@@ -239,12 +240,6 @@
+ 
+-         // Stop video stream
+-         if (streamRef.current) {
+-             streamRef.current.getTracks().forEach(track => track.stop());
+-             streamRef.current = null;
+-         }
+- 
+-         // Cleanup video element
+-         if (videoRef.current) {
+-             videoRef.current.pause();
+-             videoRef.current.srcObject = null;
+-             videoRef.current = null;
+-         }
++         // DO NOT stop global stream and video here.
++         // They persist until fully completed (done outside).
++         // If we need to forcefully close it, we can expose a utility.
+ 

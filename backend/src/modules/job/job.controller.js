@@ -139,9 +139,9 @@ export const deleteJob = catchAsync(async (req, res, next) => {
     // Ownership check is done in middleware (requireOwnership)
     // req.job is set by the middleware
 
-    // Verify job is CLOSED before allowing deletion
-    if (req.job.status !== 'CLOSED') {
-        return next(new AppError('Only closed jobs can be deleted', 400));
+    // Verify job is CLOSED or DRAFT before allowing deletion
+    if (req.job.status !== 'CLOSED' && req.job.status !== 'DRAFT') {
+        return next(new AppError('Only closed or draft jobs can be deleted', 400));
     }
 
     await jobService.deleteJob(req.params.id);

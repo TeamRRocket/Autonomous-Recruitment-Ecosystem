@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Editor from '@monaco-editor/react';
+import { Play, Send, Clock, Terminal, Minimize2, FileCode, Settings, CheckCircle2, AlertCircle, Maximize2 } from 'lucide-react';
 import { getDsaResult, getDsaStatus, runDsa, saveDsaDraft, startDsaRound, submitDsa } from '../../services/dsaService';
 import { getRounds } from '../../services/roundService';
 import useProctoring from '../../hooks/useProctoring';
@@ -17,9 +18,7 @@ int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
 
-    // TODO: Read input
-
-    // TODO: Write output
+    // TODO: Write your solution here
 
     return 0;
 }
@@ -28,908 +27,631 @@ int main() {
 const pad2 = (n) => n.toString().padStart(2, '0');
 
 const CandidateDsaRound = () => {
-  const { jobId } = useParams();
-  const navigate = useNavigate();
+    const { jobId } = useParams();
+    const navigate = useNavigate();
 
-  const splitContainerRef = useRef(null);
-  const [rightPanePx, setRightPanePx] = useState(() => {
-    const raw = typeof window !== 'undefined' ? window.localStorage.getItem('dsa:rightPanePx') : null;
-    const n = raw ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(n) ? n : 520;
-  });
-  const [draggingSplit, setDraggingSplit] = useState(false);
+    // -- State --
+    const [loading, setLoading] = useState(true);
+    const [attemptId, setAttemptId] = useState(null);
+    const [status, setStatus] = useState(null);
+    const [endsAt, setEndsAt] = useState(null);
+    const [serverTime, setServerTime] = useState(null); // unused but kept for completeness
+    const [nowTick, setNowTick] = useState(Date.now());
+    
+    // Problems & Code
+    const [problems, setProblems] = useState([]);
+    const [activeProblemId, setActiveProblemId] = useState(null);
+    const [submittedProblemIds, setSubmittedProblemIds] = useState([]);
+    const [codeByProblem, setCodeByProblem] = useState({});
+    
+    // Execution
+    const [running, setRunning] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [runResult, setRunResult] = useState(null);
+    const [finalResult, setFinalResult] = useState(null);
+    const [showConsole, setShowConsole] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [attemptId, setAttemptId] = useState(null);
-  const [status, setStatus] = useState(null);
-  const [endsAt, setEndsAt] = useState(null);
-  const [serverTime, setServerTime] = useState(null);
-  const [nowTick, setNowTick] = useState(Date.now());
-  const [problems, setProblems] = useState([]);
-  const [activeProblemId, setActiveProblemId] = useState(null);
-  const [submittedProblemIds, setSubmittedProblemIds] = useState([]);
-  const [remaining, setRemaining] = useState(null);
-  const [stdin, setStdin] = useState('');
-  const [running, setRunning] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [runResult, setRunResult] = useState(null);
-  const [finalResult, setFinalResult] = useState(null);
+    // UI
+    const [redirected, setRedirected] = useState(false);
+    
+    // Proctoring
+    const alreadyConsented = sessionStorage.getItem('proctoring_consent') === 'true';
+    const [showConsent, setShowConsent] = useState(false);
+    const [proctoringSessionId, setProctoringSessionId] = useState(null);
+    const [examStarted, setExamStarted] = useState(false);
+    const [fullscreenLocked, setFullscreenLocked] = useState(false);
 
-  const [autoSubmitted, setAutoSubmitted] = useState(false);
-  const [redirected, setRedirected] = useState(false);
-  const [forceClosed, setForceClosed] = useState(false);
+    const {
+        isProctoring,
+        startProctoring,
+        stopProctoring
+    } = useProctoring(proctoringSessionId, examStarted && !finalResult && !fullscreenLocked);
 
-  const [codeByProblem, setCodeByProblem] = useState({});
+    // -- Refs for Autosave & Anticheat --
+    const saveTimerRef = useRef(null);
+    const antiCheatRef = useRef([]);
 
-  // Proctoring is optional - start exam immediately if consent was given previously
-  const alreadyConsented = sessionStorage.getItem('proctoring_consent') === 'true';
-  const [showConsent, setShowConsent] = useState(false); // Don't block with consent modal
-  const [consentGiven, setConsentGiven] = useState(true); // Always allow exam to start
-  const [proctoringSessionId, setProctoringSessionId] = useState(null);
-  const [examStarted, setExamStarted] = useState(false);
-  const [fullscreenLocked, setFullscreenLocked] = useState(true);
+    // -- Computed --
+    const activeProblem = useMemo(() => problems.find(p => String(p.id) === String(activeProblemId)), [problems, activeProblemId]);
+    const isSubmitted = useMemo(() => submittedProblemIds.includes(String(activeProblemId)), [submittedProblemIds, activeProblemId]);
+    
+    const editorReadOnly = fullscreenLocked || status === 'SUBMITTED' || status === 'EXPIRED' || isSubmitted;
 
-  // Proctoring hook
-  const {
-    isProctoring,
-    hasWebcamPermission,
-    error: proctoringError,
-    startProctoring,
-    stopProctoring,
-    sendBrowserEvent
-  } = useProctoring(proctoringSessionId, examStarted && !finalResult && !fullscreenLocked);
+    const currentCode = useMemo(() => {
+        if (!activeProblemId) return DEFAULT_CPP_TEMPLATE;
+        return codeByProblem[activeProblemId] ?? activeProblem?.boilerplate_cpp ?? DEFAULT_CPP_TEMPLATE;
+    }, [activeProblemId, codeByProblem, activeProblem]);
 
-  const saveTimerRef = useRef(null);
-  const lastSavedRef = useRef({});
-  const hadFullscreenRef = useRef(false);
-  /** Flushed to server on each problem submit (DSA anti-cheat table) */
-  const antiCheatRef = useRef([]);
-  const codeByProblemRef = useRef(codeByProblem);
-  codeByProblemRef.current = codeByProblem;
+    // -- Timer --
+    const timeLeftLabel = useMemo(() => {
+        if (!endsAt) return "00:00:00";
+        const end = new Date(endsAt).getTime();
+        const diff = Math.max(0, end - nowTick);
+        const totalSeconds = Math.floor(diff / 1000);
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+    }, [endsAt, nowTick]);
 
-  const activeProblem = useMemo(
-    () => problems.find((p) => p.id === activeProblemId) || null,
-    [problems, activeProblemId]
-  );
+    useEffect(() => {
+        if (!endsAt) return;
+        const t = setInterval(() => setNowTick(Date.now()), 1000);
+        return () => clearInterval(t);
+    }, [endsAt]);
 
-  const submittedSet = useMemo(() => new Set((submittedProblemIds || []).map((v) => String(v))), [submittedProblemIds]);
-  const activeProblemSubmitted = !!activeProblemId && submittedSet.has(String(activeProblemId));
-
-  const editorReadOnly = fullscreenLocked || status === 'SUBMITTED' || status === 'EXPIRED' || activeProblemSubmitted;
-
-  const timeLeftMs = useMemo(() => {
-    if (!endsAt) return 0;
-    const end = new Date(endsAt).getTime();
-    return Math.max(0, end - nowTick);
-  }, [endsAt, nowTick]);
-
-  const timeLeftLabel = useMemo(() => {
-    const totalSeconds = Math.floor(timeLeftMs / 1000);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
-  }, [timeLeftMs]);
-
-  const enterFullscreenAndStart = useCallback(async () => {
-    try {
-      await document.documentElement.requestFullscreen();
-      setFullscreenLocked(false);
-    } catch {
-      toast.error('Fullscreen is required. Please allow fullscreen for this site.');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!endsAt) return;
-    const t = setInterval(() => setNowTick(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [endsAt]);
-
-  useEffect(() => {
-    const onFs = () => {
-      if (!examStarted || finalResult) return;
-      setFullscreenLocked(!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', onFs);
-    return () => document.removeEventListener('fullscreenchange', onFs);
-  }, [examStarted, finalResult]);
-
-  const currentCode = useMemo(() => {
-    if (!activeProblemId) return DEFAULT_CPP_TEMPLATE;
-    return codeByProblem[activeProblemId] ?? activeProblem?.boilerplate_cpp ?? DEFAULT_CPP_TEMPLATE;
-  }, [activeProblemId, codeByProblem, activeProblem]);
-
-  const setCurrentCode = (next) => {
-    if (!activeProblemId) return;
-    setCodeByProblem((prev) => ({ ...prev, [activeProblemId]: typeof next === 'string' ? next : '' }));
-  };
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('dsa:rightPanePx', String(rightPanePx));
-    } catch {
-      // ignore
-    }
-  }, [rightPanePx]);
-
-  useEffect(() => {
-    if (!draggingSplit) return;
-
-    const onMove = (e) => {
-      const el = splitContainerRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const containerW = rect.width;
-      if (!Number.isFinite(containerW) || containerW <= 0) return;
-
-      const minLeft = 360;
-      const minRight = 380;
-      const maxRight = Math.max(minRight, Math.floor(containerW - minLeft));
-      const nextRight = Math.round(containerW - x);
-      const clamped = Math.max(minRight, Math.min(maxRight, nextRight));
-      setRightPanePx(clamped);
-    };
-
-    const onUp = () => setDraggingSplit(false);
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-  }, [draggingSplit]);
-
-  // Fullscreen removed - can only be triggered by user gesture, not automatically
-
-  useEffect(() => {
-    if (!attemptId) return;
-    if (finalResult) return;
-
-    const onPop = () => {
-      try {
-        window.history.pushState(null, '', window.location.href);
-      } catch {
-        // ignore
-      }
-    };
-
-    try {
-      window.history.pushState(null, '', window.location.href);
-    } catch {
-      // ignore
-    }
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, [attemptId, finalResult]);
-
-  useEffect(() => {
-    if (!finalResult) return;
-    if (redirected) return;
-    setRedirected(true);
-
-    // End proctoring session
-    const endProctoringAndRedirect = async () => {
-      // Clean up proctoring
-      if (proctoringSessionId) {
+    // -- Init / Load --
+    const loadRef = useRef(false);
+    
+    const load = useCallback(async () => {
+        setLoading(true);
         try {
-          await proctoringService.endSession(proctoringSessionId);
-          console.log('✓ Proctoring session ended');
+            const startRes = await startDsaRound(jobId);
+            const data = startRes.data;
+            
+            setAttemptId(data.attempt_id);
+            setStatus(data.status);
+            setEndsAt(data.ends_at);
+            setServerTime(data.server_time);
+            setSubmittedProblemIds((data.submitted_problem_ids || []).map(String));
+
+            const normProblems = (data.problems || []).map(p => ({
+                ...p,
+                id: String(p.id)
+            }));
+            setProblems(normProblems);
+
+            // Set active problem to first unsubmitted or first
+            const firstUnsub = normProblems.find(p => !(data.submitted_problem_ids || []).map(String).includes(String(p.id)));
+            setActiveProblemId(firstUnsub ? String(firstUnsub.id) : String(normProblems[0]?.id));
+
+            // Hydrate local drafts
+            const initialCode = {};
+            for (const p of normProblems) {
+                const local = localStorage.getItem(`dsa:draft:${jobId}:${p.id}`);
+                initialCode[p.id] = local || p.boilerplate_cpp || DEFAULT_CPP_TEMPLATE;
+            }
+            setCodeByProblem(initialCode);
+
+            // Start Proctoring (Non-blocking) - check for existing session
+            if (alreadyConsented) {
+                try {
+                    // Check if proctoring session already exists from previous round
+                    const existingSessionId = sessionStorage.getItem('proctoring_session_id');
+                    const session = await proctoringService.startSession(jobId, 'DSA', data.attempt_id, existingSessionId);
+                    const sessionId = session.id;
+                    sessionStorage.setItem('proctoring_session_id', sessionId);
+                    
+                    setProctoringSessionId(sessionId);
+                    await startProctoring(sessionId);
+                } catch (e) { console.error('Proctoring start failed', e); }
+            } else {
+                setShowConsent(true);
+            }
+
+            setExamStarted(true);
         } catch (err) {
-          console.error('Failed to end proctoring session:', err);
+            console.error(err);
+            toast.error('Failed to load DSA round. Please try again.');
+        } finally {
+            setLoading(false);
         }
-      }
-      const go = async () => {
-        if (!jobId) {
-          navigate('/applications', { replace: true });
-          return;
+    }, [jobId, alreadyConsented, startProctoring]);
+
+    useEffect(() => { 
+        if (loadRef.current) return;
+        loadRef.current = true;
+        load(); 
+    }, [load]);
+
+    // -- Polling Status --
+    useEffect(() => {
+        if (!jobId || !examStarted || finalResult) return;
+        const t = setInterval(async () => {
+            try {
+                const st = await getDsaStatus(jobId);
+                setStatus(st.data.status);
+                setEndsAt(st.data.ends_at);
+                setSubmittedProblemIds((st.data.submitted_problem_ids || []).map(String));
+                if (st.data.status === 'SUBMITTED') {
+                    const res = await getDsaResult(jobId);
+                    setFinalResult(res.data);
+                }
+            } catch {}
+        }, 5000);
+        return () => clearInterval(t);
+    }, [jobId, examStarted, finalResult]);
+
+    // -- Code Change & Autosave --
+    const handleCodeChange = (val) => {
+        if (!activeProblemId || editorReadOnly) return;
+        setCodeByProblem(prev => ({ ...prev, [activeProblemId]: val }));
+        
+        // Autosave debounce
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(async () => {
+            localStorage.setItem(`dsa:draft:${jobId}:${activeProblemId}`, val);
+            try {
+                await saveDsaDraft({
+                    job_id: jobId,
+                    attempt_id: attemptId,
+                    problem_id: String(activeProblemId),
+                    source_code: val
+                });
+            } catch {}
+        }, 1000);
+    };
+
+    // -- Actions --
+    const handleRun = async () => {
+        if (!activeProblemId) return;
+        setRunning(true);
+        setShowConsole(true);
+        setRunResult(null);
+        try {
+            const res = await runDsa({
+                job_id: jobId,
+                attempt_id: attemptId,
+                problem_id: String(activeProblemId),
+                source_code: currentCode
+            });
+            setRunResult(res.data); // Expect { status, stdout, stderr }
+        } catch (err) {
+            toast.error('Run failed');
+            setRunResult({ status: 'ERROR', stderr: 'Network or internal error.' });
+        } finally {
+            setRunning(false);
         }
+    };
+
+    const handleSubmit = useRef(null);
+    handleSubmit.current = async () => {
+        if (isSubmitted) return;
+        setSubmitting(true);
+        try {
+            const res = await submitDsa({
+                job_id: jobId,
+                attempt_id: attemptId,
+                solutions: [{ problem_id: String(activeProblemId), source_code: currentCode }],
+                anti_cheat_events: []
+            });
+            
+            setSubmittedProblemIds((res.data.submitted_problem_ids || []).map(String));
+            
+            if (res.data.status === 'SUBMITTED') {
+                setFinalResult(res.data);
+                toast.success('All submitted!');
+            } else {
+                toast.success('Problem submitted successfully');
+                // Move to next unsubmitted
+                const next = problems.find(p => !(res.data.submitted_problem_ids || []).map(String).includes(String(p.id)));
+                if (next) setActiveProblemId(String(next.id));
+            }
+        } catch (err) {
+            toast.error('Submission failed');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleNextRound = async () => {
+         if (!jobId || redirected) return;
+         setRedirected(true);
 
         try {
-          const r = await getRounds(jobId);
-          const rounds = Array.isArray(r?.data) ? r.data : [];
-          const next = getNextRoundAfter(rounds, 'DSA');
-          if (next) {
-            // Keep consent for the next immediate round in this pipeline.
-            navigate(getNavigatePathForRound(jobId, next), { replace: true });
-            return;
-          }
-        } catch {
-          // ignore
-        }
-
-        try {
-          if (document?.fullscreenElement && document?.exitFullscreen) {
-            document.exitFullscreen();
-          }
-        } catch {
-          // ignore
+            const r = await getRounds(jobId);
+            const rounds = Array.isArray(r?.data) ? r.data : [];
+            const next = getNextRoundAfter(rounds, 'DSA');
+            if (next) {
+                // Continue to next round - don't stop proctoring
+                navigate(getNavigatePathForRound(jobId, next), { replace: true });
+                return;
+            }
+        } catch {}
+        
+        // No more rounds - stop proctoring and generate summary
+        if (proctoringSessionId) {
+            try { 
+                await proctoringService.endSession(proctoringSessionId); 
+                sessionStorage.removeItem('proctoring_session_id');
+            } catch (e) { console.error('Failed to end proctoring session:', e); }
         }
         stopProctoring();
-        sessionStorage.removeItem('proctoring_consent');
         navigate('/applications', { replace: true });
-      };
-
-      go();
     };
 
-    endProctoringAndRedirect();
-  }, [finalResult, redirected, navigate, proctoringSessionId, stopProctoring]);
-
-  const scheduleSave = (problemId, source) => {
-    if (!attemptId || !problemId) return;
-    if (typeof source !== 'string') return;
-
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-
-    saveTimerRef.current = setTimeout(async () => {
-      try {
-        const last = lastSavedRef.current[problemId];
-        if (last === source) return;
-        await saveDsaDraft({
-          job_id: jobId,
-          attempt_id: attemptId,
-          problem_id: String(problemId),
-          source_code: source,
-        });
-        lastSavedRef.current[problemId] = source;
-      } catch {
-        // Autosave failures should not block the candidate.
-      }
-    }, 900);
-  };
-
-  // Handle consent acceptance
-  const handleConsentAccept = async () => {
-    setShowConsent(false);
-    setConsentGiven(true);
-    sessionStorage.setItem('proctoring_consent', 'true');
-  };
-
-  // Handle consent decline - allow exam without proctoring
-  const handleConsentDecline = () => {
-    setShowConsent(false);
-    setConsentGiven(true); // Allow exam to proceed without proctoring
-    toast.warning('Continuing without proctoring');
-  };
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const startRes = await startDsaRound(jobId);
-      setAttemptId(startRes.data.attempt_id);
-      setStatus(startRes.data.status);
-      setEndsAt(startRes.data.ends_at);
-      setServerTime(startRes.data.server_time);
-      setSubmittedProblemIds((startRes.data.submitted_problem_ids || []).map((v) => String(v)));
-      setRemaining(startRes.data.remaining ?? null);
-
-      const normalizedProblems = (startRes.data.problems || []).map((p) => ({
-        ...p,
-        id: p?.id != null ? String(p.id) : p.id,
-      }));
-      setProblems(normalizedProblems);
-      const submitted = new Set((startRes.data.submitted_problem_ids || []).map((v) => String(v)));
-      const firstUnsubmitted = normalizedProblems.find((p) => !submitted.has(String(p.id)));
-      setActiveProblemId((firstUnsubmitted?.id || normalizedProblems?.[0]?.id) ?? null);
-
-      const initialCode = {};
-      for (const p of normalizedProblems) {
-        const pid = p?.id != null ? String(p.id) : p.id;
-        const local = localStorage.getItem(`dsa:draft:${jobId}:${pid}`);
-        initialCode[pid] = local || p.boilerplate_cpp || DEFAULT_CPP_TEMPLATE;
-      }
-      setCodeByProblem(initialCode);
-
-      // Start proctoring session if consent was given (NON-FATAL - exam continues without it)
-      if (alreadyConsented) {
-        try {
-          const session = await proctoringService.startSession(
-            jobId,
-            'DSA',
-            startRes.data.attempt_id
-          );
-          setProctoringSessionId(session.id);
-
-          // Request camera permission and start proctoring
-          const started = await startProctoring(session.id);
-
-          if (!started) {
-            console.warn('Camera permission denied for DSA proctoring - exam continues without proctoring');
-          }
-        } catch (err) {
-          console.error('Failed to start proctoring for DSA:', err);
-          // Non-fatal: exam continues without proctoring
+    // Automatically handle end
+    useEffect(() => {
+        if (finalResult && !redirected) {
+             // In a real app we might show a summary modal first, 
+            // but for now we can redirect or just let user click 'Continue'
+            // Added a manual button for clarity in this design
         }
-      }
+    }, [finalResult, redirected]);
 
-      setExamStarted(true);
-      setFullscreenLocked(!document.fullscreenElement);
-    } catch (err) {
-      console.error('Failed to start DSA round:', err);
-      const errorMsg = err.response?.data?.message || 'Failed to start DSA round';
-      toast.error(errorMsg);
-      
-      // Show error in UI instead of navigating away
-      setLoading(false);
-      setProblems([]);
-      
-      // If it's a prerequisite error (403), show helpful message
-      if (err.response?.status === 403) {
-        setTimeout(() => {
-          toast.error('Please complete the Aptitude round first', { duration: 5000 });
-          setTimeout(() => navigate('/applications'), 2000);
-        }, 1000);
-      } else {
-        setTimeout(() => navigate('/applications'), 3000);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    load(); // Start immediately without waiting for consent
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId]);
+    // -- Anticheat Enforcements --
+    useEffect(() => {
+        if (!examStarted || finalResult || !proctoringSessionId || !handleSubmit.current) return;
 
-  useEffect(() => {
-    if (!jobId) return;
-    if (!examStarted) return; // Don't poll until exam actually starts
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                if(proctoringSessionId) sendBrowserEvent('TAB_SWITCH', {});
+                // Stop proctoring and generate summary on tab switch
+                proctoringService.endSession(proctoringSessionId).catch(e => console.error(e));
+                sessionStorage.removeItem('proctoring_session_id');
+                stopProctoring();
+                toast.error('Tab switching detected. Exam locked.');
+                handleSubmit.current(); // Enforce submit
+            }
+        };
 
-    const timer = setInterval(async () => {
-      try {
-        const st = await getDsaStatus(jobId);
-        setStatus(st.data.status);
-        setEndsAt(st.data.ends_at);
-        setServerTime(st.data.server_time);
-        setSubmittedProblemIds((st.data.submitted_problem_ids || []).map((v) => String(v)));
-        setRemaining(st.data.remaining ?? null);
+        const onBlur = () => {
+            if(proctoringSessionId) sendBrowserEvent('WINDOW_BLUR', { reason: 'blur' });
+            toast.error('Window blur detected!');
+        };
 
-        if (st.data.status === 'SUBMITTED') {
-          const res = await getDsaResult(jobId);
-          setFinalResult(res.data);
-        }
-      } catch {
-        // Ignore transient polling errors.
-      }
-    }, 3000);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('blur', onBlur);
 
-    return () => clearInterval(timer);
-  }, [jobId, examStarted]);
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('blur', onBlur);
+        };
+    }, [examStarted, finalResult, proctoringSessionId]); // handleSubmit is a ref, so stable
 
-  useEffect(() => {
-    if (!activeProblemId) return;
-    const code = codeByProblem[activeProblemId];
-    if (code == null) return;
-
-    localStorage.setItem(`dsa:draft:${jobId}:${activeProblemId}`, code);
-    scheduleSave(activeProblemId, code);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, activeProblemId, codeByProblem[activeProblemId]]);
-
-  const handleRun = async () => {
-    if (!attemptId || !activeProblemId || !activeProblem) return;
-
-    const source_code = codeByProblem[activeProblemId] || activeProblem.boilerplate_cpp || DEFAULT_CPP_TEMPLATE;
-    if (!source_code.trim()) {
-      toast.error('Code is empty');
-      return;
+    // -- Render --
+    if (loading) return <div className="h-screen bg-black flex items-center justify-center text-white font-mono animate-pulse">Loading Assessment Environment...</div>;
+    
+    if (finalResult) {
+        return (
+            <div className="h-screen bg-black flex flex-col items-center justify-center text-white space-y-6">
+                <div className="p-4 rounded-full bg-emerald-500/20 text-emerald-400 mb-2">
+                    <CheckCircle2 size={64} />
+                </div>
+                <h2 className="text-3xl font-bold">Assessment Complete</h2>
+                <p className="text-zinc-400">Your solutions have been submitted successfully.</p>
+                <div className="flex gap-4">
+                    <button 
+                        onClick={handleNextRound}
+                        className="px-6 py-2 rounded bg-blue-600 hover:bg-blue-500 font-bold transition"
+                    >
+                        Continue Application
+                    </button>
+                </div>
+            </div>
+        );
     }
 
-    setRunning(true);
-    setRunResult(null);
-    try {
-      const res = await runDsa({
-        job_id: jobId,
-        attempt_id: attemptId,
-        problem_id: String(activeProblemId),
-        source_code,
-        stdin,
-      });
-      setRunResult(res.data);
-    } catch (err) {
-      if (!err.response) {
-        toast.error('Backend not reachable (http://localhost:3000). Start the backend and try again.');
-      } else {
-        toast.error(err.response?.data?.message || 'Run failed');
-      }
-    } finally {
-      setRunning(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!attemptId || !activeProblemId || !activeProblem) return;
-    if (submittedSet.has(String(activeProblemId))) {
-      toast.error('Problem already submitted');
-      return;
-    }
-
-    const solutions = [
-      {
-        problem_id: String(activeProblemId),
-        source_code: codeByProblem[activeProblemId] || activeProblem.boilerplate_cpp || DEFAULT_CPP_TEMPLATE,
-      },
-    ];
-
-    setSubmitting(true);
-    try {
-      const anti_cheat_events = antiCheatRef.current.splice(0);
-      const res = await submitDsa({ job_id: jobId, attempt_id: attemptId, solutions, anti_cheat_events });
-
-      const nextStatus = res?.data?.status;
-      const nextSubmitted = (res?.data?.submitted_problem_ids || []).map((v) => String(v));
-      setSubmittedProblemIds(nextSubmitted);
-      setRemaining(res?.data?.remaining ?? null);
-      setRunResult(null);
-
-      if (nextStatus === 'SUBMITTED') {
-        setFinalResult(res.data);
-        toast.success('DSA round submitted');
-        return;
-      }
-
-      toast.success('Answer submitted');
-
-      // Move to next unsubmitted problem automatically
-      const nextUnsubmitted = problems.find((p) => !new Set(nextSubmitted).has(String(p.id)));
-      if (nextUnsubmitted?.id) {
-        setActiveProblemId(String(nextUnsubmitted.id));
-      }
-    } catch (err) {
-      if (!err.response) {
-        toast.error('Backend not reachable (http://localhost:3000). Start the backend and try again.');
-      } else {
-        toast.error(err.response?.data?.message || 'Submit failed');
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const submitAllRemaining = useCallback(async () => {
-    if (!attemptId) return;
-
-    const submitted = new Set((submittedProblemIds || []).map((v) => String(v)));
-    const unsubmitted = problems.filter((p) => !submitted.has(String(p.id)));
-    if (unsubmitted.length === 0) return;
-
-    const code = codeByProblemRef.current;
-    const solutions = unsubmitted.map((p) => ({
-      problem_id: String(p.id),
-      source_code: code[p.id] || p.boilerplate_cpp || DEFAULT_CPP_TEMPLATE,
-    }));
-
-    setSubmitting(true);
-    try {
-      const anti_cheat_events = antiCheatRef.current.splice(0);
-      const res = await submitDsa({ job_id: jobId, attempt_id: attemptId, solutions, anti_cheat_events });
-      const nextStatus = res?.data?.status;
-      const nextSubmitted = (res?.data?.submitted_problem_ids || []).map((v) => String(v));
-      setSubmittedProblemIds(nextSubmitted);
-      setRemaining(res?.data?.remaining ?? null);
-      setRunResult(null);
-
-      if (nextStatus === 'SUBMITTED') {
-        setFinalResult(res.data);
-      }
-    } catch {
-      // ignore (auto submit should not spam errors)
-    } finally {
-      setSubmitting(false);
-    }
-  }, [attemptId, jobId, problems, submittedProblemIds]);
-
-  /** Any security violation (tab/blur/fullscreen-exit) closes round once */
-  const tabAutoSubmitDoneRef = useRef(false);
-  const closeRoundOnViolation = useCallback(async (reason = 'Security violation') => {
-    if (tabAutoSubmitDoneRef.current) return;
-    tabAutoSubmitDoneRef.current = true;
-    setForceClosed(true);
-    toast.error(`${reason}. DSA round is closing and submitting now.`);
-    try {
-      await submitAllRemaining();
-    } finally {
-      try {
-        if (proctoringSessionId) {
-          await proctoringService.endSession(proctoringSessionId);
-        }
-      } catch {
-        // ignore
-      }
-      stopProctoring();
-      sessionStorage.removeItem('proctoring_consent');
-      navigate('/applications', { replace: true });
-    }
-  }, [submitAllRemaining, proctoringSessionId, stopProctoring, navigate]);
-
-  useEffect(() => {
-    if (!examStarted || !attemptId || finalResult) return;
-    const onVis = () => {
-      if (document.visibilityState === 'hidden') {
-        void closeRoundOnViolation('Tab switched');
-      }
-    };
-    const onBlur = () => void closeRoundOnViolation('Window focus lost');
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('blur', onBlur);
-    return () => {
-      document.removeEventListener('visibilitychange', onVis);
-      window.removeEventListener('blur', onBlur);
-    };
-  }, [examStarted, attemptId, finalResult, closeRoundOnViolation]);
-
-  useEffect(() => {
-    if (!examStarted || !attemptId || finalResult) return;
-    const onFsViolation = () => {
-      const inFullscreen = !!document.fullscreenElement;
-      if (inFullscreen) hadFullscreenRef.current = true;
-      if (hadFullscreenRef.current && !inFullscreen) {
-        void closeRoundOnViolation('Fullscreen exited');
-      }
-    };
-    document.addEventListener('fullscreenchange', onFsViolation);
-    return () => document.removeEventListener('fullscreenchange', onFsViolation);
-  }, [examStarted, attemptId, finalResult, closeRoundOnViolation]);
-
-  /** Block copy/cut/paste in the round (stdin field may still paste — marked data-allow-paste) */
-  useEffect(() => {
-    if (!examStarted || finalResult) return;
-
-    const allowPasteTarget = (el) => el?.closest?.('[data-allow-paste="true"]');
-
-    const onClipboardBlock = (e) => {
-      if (allowPasteTarget(e.target)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      antiCheatRef.current.push({ event_type: 'CLIPBOARD_' + e.type.toUpperCase() });
-      sendBrowserEvent('COPY_PASTE_BLOCKED', { action: e.type, timestamp: new Date().toISOString() });
-    };
-
-    const onKeyBlock = (e) => {
-      if (allowPasteTarget(e.target)) return;
-      if (e.ctrlKey || e.metaKey) {
-        const k = e.key?.toLowerCase?.();
-        if (k === 'c' || k === 'v' || k === 'x') {
-          e.preventDefault();
-          e.stopPropagation();
-          antiCheatRef.current.push({ event_type: 'KEYBOARD_' + k.toUpperCase() });
-        }
-      }
-    };
-
-    document.addEventListener('copy', onClipboardBlock, true);
-    document.addEventListener('cut', onClipboardBlock, true);
-    document.addEventListener('paste', onClipboardBlock, true);
-    window.addEventListener('keydown', onKeyBlock, true);
-
-    return () => {
-      document.removeEventListener('copy', onClipboardBlock, true);
-      document.removeEventListener('cut', onClipboardBlock, true);
-      document.removeEventListener('paste', onClipboardBlock, true);
-      window.removeEventListener('keydown', onKeyBlock, true);
-    };
-  }, [examStarted, finalResult, sendBrowserEvent]);
-
-  /** Persist tab/blur counts for DSA anti_cheat rows (useProctoring already sends proctoring HTTP events) */
-  useEffect(() => {
-    if (!examStarted || finalResult) return;
-
-    const onVis = () => {
-      if (document.visibilityState !== 'visible') {
-        antiCheatRef.current.push({ event_type: 'TAB_HIDDEN' });
-      }
-    };
-    const onBlur = () => {
-      antiCheatRef.current.push({ event_type: 'WINDOW_BLUR' });
-    };
-
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('blur', onBlur);
-    return () => {
-      document.removeEventListener('visibilitychange', onVis);
-      window.removeEventListener('blur', onBlur);
-    };
-  }, [examStarted, finalResult]);
-
-  useEffect(() => {
-    if (!attemptId) return;
-    if (!endsAt) return;
-    if (finalResult) return;
-    if (autoSubmitted) return;
-
-    const end = new Date(endsAt).getTime();
-    if (!Number.isFinite(end)) return;
-    if (Date.now() <= end) return;
-
-    setAutoSubmitted(true);
-    submitAllRemaining();
-  }, [attemptId, endsAt, finalResult, autoSubmitted, nowTick, submitAllRemaining]);
-
-  // Show consent modal FIRST (before any loading checks)
-  if (showConsent) {
     return (
-      <ProctoringConsent
-        onAccept={handleConsentAccept}
-        onDecline={handleConsentDecline}
-      />
-    );
-  }
+        <div className="flex flex-col h-screen bg-black text-white font-sans overflow-hidden">
+            {/* Proctoring Consent Overlay */}
+            {showConsent && (
+                <ProctoringConsent 
+                    onAccept={async () => {
+                        setShowConsent(false);
+                        sessionStorage.setItem('proctoring_consent', 'true');
+                        try {
+                            const session = await proctoringService.startSession(jobId, 'DSA', attemptId);
+                            setProctoringSessionId(session.id);
+                            await startProctoring(session.id);
+                        } catch(e) {}
+                    }} 
+                    onDecline={() => setShowConsent(false)}
+                />
+            )}
 
-  if (loading) {
-    return <div className="p-8 text-slate-400">Loading DSA round...</div>;
-  }
-
-  if (forceClosed) {
-    return <div className="p-8 text-slate-300">Closing DSA round due to tab switch...</div>;
-  }
-
-  if (!problems.length && !loading) {
-    return <div className="p-8 text-slate-400">DSA round not available.</div>;
-  }
-
-  return (
-    <div className="h-screen overflow-hidden bg-slate-950 text-slate-100">
-      {/* Recording Indicator */}
-      {isProctoring && <RecordingIndicator />}
-      {fullscreenLocked && attemptId && !finalResult && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 px-4">
-          <div className="max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-8 text-center shadow-2xl">
-            <h2 className="mb-2 text-xl font-bold text-white">Fullscreen required</h2>
-            <p className="mb-6 text-sm text-slate-300">
-              Click below to enter fullscreen and continue your DSA round.
-            </p>
-            <button
-              type="button"
-              onClick={enterFullscreenAndStart}
-              className="w-full rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white hover:bg-indigo-500"
-            >
-              Enter fullscreen and continue
-            </button>
-          </div>
-        </div>
-      )}
-      <div className="fixed right-4 top-4 z-40 rounded-xl border border-slate-700 bg-slate-900/90 px-4 py-2 text-right shadow-lg backdrop-blur">
-        <p className="text-[10px] uppercase tracking-widest text-slate-400">Time Left</p>
-        <p className={`text-lg font-semibold ${timeLeftMs > 0 ? 'text-amber-300' : 'text-red-400'}`}>{timeLeftLabel}</p>
-      </div>
-
-      <div ref={splitContainerRef} className="w-full px-4 sm:px-6 lg:px-8 py-6 h-full">
-        <div className="h-full min-h-0 flex flex-col lg:flex-row gap-6">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 flex flex-col min-h-0 lg:flex-1" style={{ width: undefined }}>
-            <div className="flex items-start justify-between gap-4 shrink-0">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">DSA Round</p>
-                <h1 className="text-2xl font-bold text-white mt-2">{activeProblem?.title || 'Select a problem'}</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-slate-300">
-                  C++ (GNU++17)
-                </span>
-                {timeLeftMs > 0 && (
-                  <span className="text-xs font-semibold rounded-full border border-amber-600 bg-amber-900 px-3 py-1 text-amber-300">
-                    {timeLeftLabel}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-6 min-h-0 overflow-y-auto pr-1">
-              {activeProblem && (
-                <div className="space-y-4">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-200 mb-2">Problem</h2>
-                    <pre className="whitespace-pre-wrap text-sm text-slate-300 leading-relaxed">{activeProblem.problem_statement}</pre>
-                  </div>
-
-                  {activeProblem.constraints && (
-                    <div>
-                      <h2 className="text-sm font-semibold text-slate-200 mb-2">Constraints</h2>
-                      <pre className="whitespace-pre-wrap text-sm text-slate-300">{activeProblem.constraints}</pre>
-                    </div>
-                  )}
-
-                  {activeProblem.public_test_cases && activeProblem.public_test_cases.length > 0 && (
-                    <div>
-                      <h2 className="text-sm font-semibold text-slate-200 mb-2">Public Test Cases</h2>
-                      <div className="space-y-2">
-                        {activeProblem.public_test_cases.map((tc, i) => (
-                          <div key={i} className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                            <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Test #{tc.test_order}</p>
-                            <div className="mt-2">
-                              <p className="text-xs text-slate-400 mb-1">Input</p>
-                              <pre className="text-xs text-slate-200 whitespace-pre-wrap">{tc.input}</pre>
-                            </div>
-                            <div className="mt-2">
-                              <p className="text-xs text-slate-400 mb-1">Expected Output</p>
-                              <pre className="text-xs text-slate-200 whitespace-pre-wrap">{tc.expected_output}</pre>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!activeProblem && (
-                <div>
-                  <p className="text-sm text-slate-400">Select a problem from the right panel to begin.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            onMouseDown={() => setDraggingSplit(true)}
-            className="hidden lg:flex w-2 -mx-2 cursor-col-resize items-stretch"
-          >
-            <div className={`w-0.5 mx-auto rounded-full ${draggingSplit ? 'bg-indigo-500' : 'bg-slate-700/60'}`} />
-          </div>
-
-          <div className="space-y-4 min-h-0 flex flex-col" style={{ width: rightPanePx }}>
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shrink-0">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-slate-200">Problems</h2>
-                {timeLeftMs > 0 && !editorReadOnly && (
-                  <span className="text-xs font-semibold rounded-full border border-amber-600 bg-amber-900 px-3 py-1 text-amber-300">
-                    {timeLeftLabel}
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                {problems.map((p) => (
-                  (() => {
-                    const isSubmitted = submittedSet.has(String(p.id));
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => setActiveProblemId(p.id)}
-                        className={`w-full text-left rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${p.id === activeProblemId
-                          ? 'bg-indigo-600 text-white'
-                          : isSubmitted
-                            ? 'bg-slate-900 text-slate-500'
-                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                          }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span>
-                            {p.problem_order}. {p.title}
-                          </span>
-                          {isSubmitted && (
-                            <span className="text-[10px] uppercase tracking-widest rounded-full border border-slate-700 px-2 py-0.5">
-                              Submitted
-                            </span>
-                          )}
+            {/* Header */}
+            <header className="h-14 border-b border-white/10 flex items-center justify-between px-4 bg-[#0a0a0a] z-10 shrink-0">
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                        <div className="text-sm font-bold tracking-wider text-muted-foreground">DSA ROUND</div>
+                         {/* Problem Tabs */}
+                        <div className="flex items-center gap-0.5 ml-4">
+                            {problems.map((p, idx) => {
+                                const isActive = String(p.id) === String(activeProblemId);
+                                const isDone = submittedProblemIds.includes(String(p.id));
+                                return (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => setActiveProblemId(String(p.id))}
+                                        className={`px-3 py-1 text-xs font-mono rounded-md transition-all ${
+                                            isActive 
+                                            ? 'bg-blue-600 text-white font-bold shadow-lg shadow-blue-900/20' 
+                                            : isDone
+                                                ? 'text-emerald-500 hover:bg-emerald-900/10'
+                                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                                        }`}
+                                    >
+                                        P{idx + 1}
+                                    </button>
+                                );
+                            })}
                         </div>
-                      </button>
-                    );
-                  })()
-                ))}
-              </div>
-            </div>
-
-            {activeProblem && (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 min-h-0 flex flex-col">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-200">Editor</h2>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleRun}
-                      disabled={running || editorReadOnly}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-sm font-semibold disabled:opacity-50"
-                    >
-                      {running ? 'Running…' : 'Run'}
-                    </button>
-                    <button
-                      onClick={handleSubmit}
-                      disabled={submitting || editorReadOnly}
-                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold disabled:opacity-50"
-                    >
-                      {activeProblemSubmitted ? 'Submitted' : submitting ? 'Submitting…' : 'Submit'}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-3">
-                  <Editor
-                    key={activeProblemId || 'no-problem'}
-                    path={activeProblemId ? `dsa:${jobId}:${activeProblemId}.cpp` : `dsa:${jobId}:no-problem.cpp`}
-                    height="42vh"
-                    language="cpp"
-                    theme="vs-dark"
-                    value={currentCode}
-                    onChange={(value) => setCurrentCode(value ?? '')}
-                    onMount={(editor, monaco) => {
-                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {});
-                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {});
-                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {});
-                    }}
-                    options={{
-                      readOnly: editorReadOnly,
-                      minimap: { enabled: false },
-                      fontSize: 13,
-                      wordWrap: 'on',
-                      scrollBeyondLastLine: false,
-                      automaticLayout: true,
-                      contextmenu: false,
-                    }}
-                  />
-                </div>
-
-                <div className="mt-3">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Custom Input (stdin)</h3>
-                  <textarea
-                    data-allow-paste="true"
-                    value={stdin}
-                    onChange={(e) => setStdin(e.target.value)}
-                    className="w-full h-24 rounded-xl bg-slate-950/50 border border-slate-800 p-3 text-xs font-mono text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                    spellCheck={false}
-                  />
-                </div>
-              </div>
-            )}
-
-            {runResult && (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-                <h3 className="text-sm font-semibold text-slate-200">Run Result</h3>
-                <div className="mt-3 space-y-2">
-                  {(Array.isArray(runResult?.results) ? runResult.results : []).map((tc, i) => (
-                    <div key={i} className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-                      <p className="text-xs text-slate-400 uppercase tracking-widest">Test #{tc.test_order}</p>
-                      <p className="text-xs text-slate-300 mt-1">
-                        Status: <span className={`font-semibold ${tc.passed ? 'text-emerald-400' : 'text-rose-400'}`}>{tc.status}</span>
-                      </p>
-                      {tc.compile_output && (
-                        <pre className="mt-2 text-xs text-rose-300 whitespace-pre-wrap">{tc.compile_output}</pre>
-                      )}
-                      {tc.stderr && (
-                        <pre className="mt-2 text-xs text-amber-300 whitespace-pre-wrap">{tc.stderr}</pre>
-                      )}
-                      {tc.stdout && (
-                        <pre className="mt-2 text-xs text-emerald-200 whitespace-pre-wrap">{tc.stdout}</pre>
-                      )}
                     </div>
-                  ))}
                 </div>
-              </div>
-            )}
 
-            {finalResult && (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-                <h3 className="text-sm font-semibold text-slate-200">Final Result</h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Status: <span className="text-slate-100 font-semibold">{finalResult.status}</span>
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Final Score: <span className="text-indigo-400 font-bold">{finalResult.final_score}</span>
-                </p>
-                <div className="mt-3 space-y-2">
-                  {(Array.isArray(finalResult?.per_problem) ? finalResult.per_problem : []).map((p, i) => (
-                    <div key={i} className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-                      <p className="text-xs text-slate-400 uppercase tracking-widest">Problem {i + 1}</p>
-                      <p className="text-xs text-slate-300 mt-1">
-                        Score: <span className="text-indigo-400 font-bold">{p.score}</span> ({p.passed_hidden}/{p.total_hidden} hidden)
-                      </p>
+                <div className="flex items-center gap-4">
+                     {/* Timer */}
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 rounded border border-zinc-800 text-zinc-300 font-mono text-sm shadow-inner">
+                        <Clock size={14} className="text-zinc-500" />
+                        {timeLeftLabel}
                     </div>
-                  ))}
+
+                    {/* Submit All */}
+                    <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded text-sm font-bold transition-all shadow-lg shadow-red-900/20 hover:shadow-red-600/20">
+                        Submit All
+                    </button>
+                    
+                    {/* Proctoring Indicator */}
+                    {isProctoring && <div className="scale-75 origin-right"><RecordingIndicator /></div>}
                 </div>
-              </div>
-            )}
-          </div>
+            </header>
+
+            {/* Main Content - Split View */}
+            <main className="flex-1 flex overflow-hidden">
+                {/* Left Panel: Problem Statement */}
+                <div className="w-5/12 border-r border-white/10 flex flex-col bg-[#050505] min-w-[350px]">
+                    {activeProblem ? (
+                        <>
+                            {/* Problem Header */}
+                            <div className="p-6 pb-2">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <h1 className="text-2xl font-bold text-white tracking-tight leading-none">{activeProblem.title || `Problem ${problems.findIndex(p => String(p.id) === String(activeProblemId)) + 1}`}</h1>
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase tracking-widest">
+                                        Easy
+                                    </span>
+                                </div>
+                                <div className="text-sm text-zinc-500 line-clamp-2 hidden">
+                                    Topic tags or short summary could go here.
+                                </div>
+                            </div>
+
+                            {/* Section Tabs */}
+                            <div className="flex items-center gap-6 px-6 border-b border-white/5 text-[11px] font-bold tracking-wider text-zinc-500 uppercase sticky top-0 bg-[#050505] z-10">
+                                <button className="py-3 text-white border-b-2 border-white transition-colors">PROBLEM</button>
+                                <button className="py-3 hover:text-zinc-300 transition-colors">SUBMISSIONS</button>
+                                <button className="py-3 hover:text-zinc-300 transition-colors">DISCUSS</button>
+                            </div>
+
+                            {/* Scrollable Content */}
+                            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent space-y-8">
+                                <section>
+                                    <h3 className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wider hidden">Description</h3>
+                                    <div className="text-zinc-300 text-sm leading-7 selection:bg-blue-500/30 whitespace-pre-wrap font-sans">
+                                        {activeProblem.problem_statement || "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice."}
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wider">Constraints</h3>
+                                    <div className="bg-zinc-900/30 p-4 rounded-lg border border-white/5 font-mono text-xs text-zinc-400 space-y-2">
+                                        {(activeProblem.constraints || ['2 <= nums.length <= 10^4', '-10^9 <= nums[i] <= 10^9']).map((c, i) => (
+                                            <div key={i} className="flex gap-2">
+                                                <span className="text-zinc-600 select-none">•</span>
+                                                <span>{c}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wider">Sample</h3>
+                                    <div className="bg-zinc-900/30 p-4 rounded-lg border border-white/5 font-mono text-xs space-y-4">
+                                        {activeProblem.public_test_cases && activeProblem.public_test_cases.length > 0 ? (
+                                            activeProblem.public_test_cases.slice(0, 1).map((tc, idx) => (
+                                                <React.Fragment key={idx}>
+                                                    <div>
+                                                        <div className="text-zinc-500 mb-1.5 font-bold uppercase text-[10px] tracking-wider">Input</div>
+                                                        <div className="text-zinc-300 bg-black/20 p-2 rounded border border-white/5 whitespace-pre-wrap">{tc.input}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-zinc-500 mb-1.5 font-bold uppercase text-[10px] tracking-wider">Output</div>
+                                                        <div className="text-zinc-300 bg-black/20 p-2 rounded border border-white/5 whitespace-pre-wrap">{tc.expected_output}</div>
+                                                    </div>
+                                                </React.Fragment>
+                                            ))
+                                        ) : (
+                                            <>
+                                                <div>
+                                                    <div className="text-zinc-500 mb-1.5 font-bold uppercase text-[10px] tracking-wider">Input</div>
+                                                    <div className="text-zinc-300 bg-black/20 p-2 rounded border border-white/5">nums = [2,7,11,15], target = 9</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-zinc-500 mb-1.5 font-bold uppercase text-[10px] tracking-wider">Output</div>
+                                                    <div className="text-zinc-300 bg-black/20 p-2 rounded border border-white/5">[0,1]</div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </section>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 space-y-4">
+                            <div className="p-4 rounded-full bg-zinc-900">
+                                <FileCode size={32} />
+                            </div>
+                            <p>Select a problem from the top bar to begin</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Panel: Editor */}
+                <div className="flex-1 flex flex-col bg-[#0a0a0a] relative min-w-[400px]">
+                    {/* Editor Header */}
+                    <div className="h-10 flex items-center justify-between px-4 border-b border-white/5 bg-[#0a0a0a] shrink-0">
+                        <div className="flex items-center gap-2">
+                             <div className="flex items-center gap-2 px-2 py-1 bg-zinc-900 rounded text-xs text-zinc-300 border border-white/5 cursor-pointer hover:border-zinc-700 transition-colors">
+                                <FileCode size={12} className="text-blue-500" />
+                                <span className="font-mono font-medium">C++ (GNU C++17)</span>
+                             </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-zinc-500">
+                             <div className="hover:text-white cursor-pointer transition-colors p-1 rounded hover:bg-white/5">
+                                <Settings size={14} />
+                             </div>
+                             <div className="hover:text-white cursor-pointer transition-colors p-1 rounded hover:bg-white/5">
+                                 <Maximize2 size={14} className={fullscreenLocked ? 'text-zinc-700' : ''} />
+                             </div>
+                        </div>
+                    </div>
+
+                    {/* Monaco Editor */}
+                    <div className="flex-1 relative overflow-hidden">
+                        {activeProblemId && (
+                            <Editor
+                                key={activeProblemId}
+                                height="100%"
+                                language="cpp"
+                                theme="vs-dark"
+                                value={currentCode}
+                                onChange={handleCodeChange}
+                                options={{
+                                    minimap: { enabled: false },
+                                    fontSize: 14,
+                                    lineNumbers: 'on',
+                                    scrollBeyondLastLine: false,
+                                    automaticLayout: true,
+                                    padding: { top: 16 },
+                                    fontFamily: 'JetBrains Mono, Menlo, Monaco, "Courier New", monospace',
+                                    fontLigatures: true,
+                                    readOnly: editorReadOnly,
+                                    renderLineHighlight: 'line',
+                                    cursorBlinking: 'smooth',
+                                    cursorSmoothCaretAnimation: true,
+                                }}
+                            />
+                        )}
+                        
+                        {/* Console / Output Drawer */}
+                        {showConsole && (
+                            <div className="absolute bottom-0 left-0 right-0 h-1/2 min-h-[150px] max-h-[80%] bg-[#0a0a0a] border-t border-white/10 flex flex-col z-20 shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-200">
+                                <div className="h-9 shrink-0 flex items-center justify-between px-4 bg-zinc-900 border-b border-white/5">
+                                    <div className="flex items-center gap-2">
+                                        <Terminal size={12} className="text-zinc-400" />
+                                        <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Data Output</span>
+                                    </div>
+                                    <button onClick={() => setShowConsole(false)} className="text-zinc-500 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"><Minimize2 size={14}/></button>
+                                </div>
+                                <div className="flex-1 p-4 font-mono text-xs overflow-auto text-zinc-300 whitespace-pre-wrap bg-[#0c0c0c]">
+                                    {running && (
+                                        <div className="flex items-center gap-2 text-yellow-500">
+                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-yellow-500"></div>
+                                            Running Code...
+                                        </div>
+                                    )}
+                                    {!running && runResult && runResult.results && (
+                                        <div className="space-y-4">
+                                            {runResult.results.map((res, idx) => (
+                                                <div key={idx} className="p-3 bg-zinc-900 rounded border border-white/5">
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <span className="font-bold text-zinc-300">Test Case {res.test_order || idx + 1}</span>
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${res.passed || res.status === 'Accepted' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/20 text-red-400 border border-red-500/20'}`}>
+                                                            {res.status || (res.passed ? 'Passed' : 'Failed')}
+                                                        </span>
+                                                        {res.time && <span className="text-[10px] text-zinc-500">{res.time}s</span>}
+                                                    </div>
+                                                    
+                                                    {res.compile_output && (
+                                                        <div className="mb-3">
+                                                            <div className="text-red-400/70 uppercase text-[10px] font-bold mb-1">Compilation Output</div>
+                                                            <div className="text-red-400 pl-2 border-l-2 border-red-900/50 text-[11px] whitespace-pre-wrap">{res.compile_output}</div>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {res.stdout && (
+                                                        <div className="mb-3">
+                                                            <div className="text-zinc-500 uppercase text-[10px] font-bold mb-1">Standard Output</div>
+                                                            <div className="text-white/90 font-medium pl-2 border-l-2 border-zinc-700 text-[11px] whitespace-pre-wrap">{res.stdout}</div>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {res.stderr && (
+                                                        <div className="mb-3">
+                                                            <div className="text-red-400/70 uppercase text-[10px] font-bold mb-1">Standard Error</div>
+                                                            <div className="text-red-400 pl-2 border-l-2 border-red-900/50 text-[11px] whitespace-pre-wrap">{res.stderr}</div>
+                                                        </div>
+                                                    )}
+
+                                                    {!res.stdout && !res.stderr && !res.compile_output && (
+                                                        <div className="text-zinc-600 italic text-[11px]">No output generated for this test case.</div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Editor Footer */}
+                    <div className="h-14 shrink-0 border-t border-white/10 flex items-center justify-between px-4 bg-[#0a0a0a]">
+                        <button 
+                            onClick={() => setShowConsole(!showConsole)}
+                            className={`flex items-center gap-2 text-xs font-medium transition-colors px-3 py-1.5 rounded hover:bg-white/5 ${showConsole ? 'text-white bg-white/5' : 'text-zinc-500'}`}
+                        >
+                            <Terminal size={14} />
+                            Console
+                        </button>
+
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={handleRun}
+                                disabled={running || submitting}
+                                className="flex items-center gap-2 px-5 py-2 rounded bg-zinc-800 text-white text-sm font-semibold hover:bg-zinc-700 active:scale-95 transition-all border border-white/5 disabled:opacity-50 disabled:cursor-not-allowed group"
+                            >
+                                <Play size={14} className={`fill-current opacity-70 group-hover:opacity-100 transition-opacity ${running ? 'animate-pulse' : ''}`} />
+                                {running ? 'Running...' : 'Run Code'}
+                            </button>
+
+                            <button
+                                onClick={() => handleSubmit.current()}
+                                disabled={submitting || isSubmitted}
+                                className={`flex items-center gap-2 px-5 py-2 rounded text-white text-sm font-bold transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    isSubmitted 
+                                    ? 'bg-emerald-600/50 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20 group'
+                                }`}
+                            >
+                                {isSubmitted ? (
+                                    <>
+                                        <CheckCircle2 size={16} /> Submitted
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send size={16} className="group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" /> 
+                                        {submitting ? 'Submitting...' : 'Submit'}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default CandidateDsaRound;

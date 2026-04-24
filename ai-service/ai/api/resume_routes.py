@@ -74,7 +74,7 @@ def _build_resume_score_prompt(job_description: str, resume_text: str) -> str:
         "    \"education_relevance_score\": <calculate 0-100>,\n"
         "    \"overall_resume_score\": <calculate weighted average>\n"
         "  },\n"
-        "  \"professional_summary\": \"2-3 sentence summary\"\n"
+        "  \"professional_summary\": \"Write an in-depth, comprehensive evaluation of the candidate. Detail their core technical expertise, domain experience, significant achievements, and directly assess their suitability against the requirements of the job. This should be a highly analytical, multi-sentence paragraph designed to give a recruiter immediate and deep clarity on the candidate's potential and fit.\"\n"
         "}\n"
     )
 
@@ -184,3 +184,14 @@ async def score_resume(request: ScoreRequest):
         },
         "professional_summary": "",
     }
+
+
+from .performance_summary_helper import PerformanceSummaryRequest, generate_performance_summary_with_llm
+
+@router.post("/performance-summary")
+async def generate_performance_summary(req: PerformanceSummaryRequest):
+    try:
+        summary = generate_performance_summary_with_llm(req)
+        return {"summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

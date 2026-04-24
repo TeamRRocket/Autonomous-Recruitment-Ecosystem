@@ -35,15 +35,15 @@ const Step3ConfigureRounds = ({ selectedRounds, setSelectedRounds, onNext, onBac
     };
 
     return (
-        <div className="space-y-8">
-            <div className="flex items-center justify-between mb-2">
+        <div className="space-y-4 animate-fade-in text-foreground">
+            <div className="flex items-center justify-between mb-1">
                 <div>
-                    <h3 className="text-xl font-bold text-foreground font-heading">Configure Interview Experience</h3>
-                    <p className="text-muted-foreground text-sm mt-1">Set parameters for each selected round to ensure a fair assessment flow.</p>
+                     <h3 className="text-sm font-semibold text-foreground font-heading uppercase tracking-wide">Configure Rounds</h3>
+                     <p className="text-muted-foreground text-xs mt-0.5 opacity-80">Set duration, difficulty, and passing criteria.</p>
                 </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-3">
                 {selectedRounds.map((round, index) => (
                     <RoundConfigCard
                         key={round.id}
@@ -54,20 +54,20 @@ const Step3ConfigureRounds = ({ selectedRounds, setSelectedRounds, onNext, onBac
                 ))}
             </div>
 
-            <div className="pt-8 flex justify-between border-t border-border">
+            <div className="pt-2 flex justify-between border-t border-border/20 mt-4">
                 <button
                     onClick={onBack}
-                    className="px-8 py-3 rounded-lg font-semibold border border-border text-muted-foreground hover:bg-accent hover:text-foreground transition-all capitalize"
+                     className="px-4 py-2.5 rounded-md font-medium border border-border/30 text-muted-foreground hover:bg-secondary/10 hover:text-foreground transition-all capitalize text-sm"
                 >
                     Back to Selection
                 </button>
                 <button
                     onClick={handleContinue}
                     disabled={!isAllConfigured()}
-                    className={`px-8 py-3 rounded-lg font-semibold transition-all duration-200 capitalize ${
+                    className={`px-6 py-2.5 rounded-md font-semibold transition-all duration-200 capitalize text-sm ${
                         isAllConfigured()
-                        ? 'gradient-primary text-white shadow-lg hover:opacity-90'
-                        : 'bg-accent text-muted-foreground cursor-not-allowed border border-border'
+                        ? 'bg-primary hover:bg-primary/90 text-white shadow-md'
+                        : 'bg-secondary/10 text-muted-foreground cursor-not-allowed border border-border/20'
                         }`}
                 >
                     Review & Publish

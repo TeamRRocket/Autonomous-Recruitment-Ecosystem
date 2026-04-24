@@ -10,10 +10,10 @@ import { saveRounds } from '../../services/roundService';
 import toast from 'react-hot-toast';
 
 const STEPS = [
-    { label: 'Description' },
-    { label: 'Rounds' },
-    { label: 'Configure' },
-    { label: 'Review' }
+    { label: 'Job Description' },
+    { label: 'Select Rounds' },
+    { label: 'Configure Rounds' },
+    { label: 'Review & Publish' }
 ];
 
 const JobCreationWizard = () => {
@@ -178,37 +178,23 @@ const JobCreationWizard = () => {
     };
 
     return (
-        <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8 animate-fade-in">
-            <div className="max-w-5xl mx-auto">
+        <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8 animate-fade-in flex items-start justify-center">
+            <div className="max-w-3xl mx-auto w-full">
                 {/* Header */}
-                <div className="mb-8 flex justify-between items-end">
-                    <div>
-                        <button
-                            onClick={() => navigate('/dashboard')}
-                            className="text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1 transition-colors text-sm font-medium"
-                        >
-                            &larr; Exit to Dashboard
-                        </button>
-                        <h1 className="text-4xl font-black gradient-text font-heading tracking-tight">HireFlow <span className="text-primary">Architect</span></h1>
-                        <p className="mt-2 text-muted-foreground font-medium">Create a high-impact job assessment flow in 4 simple steps.</p>
-                    </div>
-                    {jobId && (
-                        <div className="hidden sm:flex items-center gap-2 mb-1">
-                            <span className="w-2 h-2 rounded-full bg-warning animate-pulse"></span>
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Draft Mode Active</span>
-                        </div>
-                    )}
+                <div className="mb-8">
+                    <h1 className="text-2xl font-bold text-white mb-1">HireFlow Architect</h1>
+                    <p className="text-sm text-muted-foreground">Create and Configure Your Job Posting</p>
+                </div>
+
+                {/* Stepper */}
+                <div className="mb-8">
+                     <StepIndicator currentStep={step} steps={STEPS} />
                 </div>
 
                 {/* Wizard Container */}
-                <div className="glass-card rounded-3xl overflow-hidden shadow-2xl">
-                    {/* Progress Header */}
-                    <div className="border-b border-border/30 p-6 bg-card/40">
-                        <StepIndicator currentStep={step} steps={STEPS} />
-                    </div>
-
+                <div className="glass-card rounded-xl border border-border bg-card/30 p-8 shadow-2xl">
                     {/* Step Content */}
-                    <div className="p-8 md:p-12">
+                    <div>
                         {step === 1 && (
                             <Step1JobDescription
                                 formData={formData}
@@ -242,11 +228,6 @@ const JobCreationWizard = () => {
                             />
                         )}
                     </div>
-                </div>
-
-                {/* Bottom Utility */}
-                <div className="mt-8 text-center text-muted-foreground text-[10px] uppercase tracking-[0.2em] font-bold">
-                    Autonomous Recruitment Ecosystem &bull; Secure Configuration Layer &bull; v1.0.4
                 </div>
             </div>
         </div>

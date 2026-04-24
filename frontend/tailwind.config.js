@@ -73,8 +73,9 @@ export default {
                 sm: "calc(var(--radius) - 4px)",
             },
             fontFamily: {
-                heading: ["Space Grotesk", "sans-serif"],
+                heading: ["Plus Jakarta Sans", "sans-serif"],
                 body: ["Inter", "sans-serif"],
+                mono: ["JetBrains Mono", "monospace"],
                 sans: ["Inter", "system-ui", "sans-serif"],
             },
             keyframes: {
