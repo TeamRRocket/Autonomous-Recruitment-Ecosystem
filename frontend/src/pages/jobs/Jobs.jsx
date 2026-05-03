@@ -129,8 +129,13 @@ const Jobs = () => {
         const matchesDegree = filters.degrees.length === 0 || filters.degrees.includes(job.degree);
         const matchesType = filters.types.length === 0 || filters.types.includes(job.type);
         const matchesOrg = filters.organizations.length === 0 || filters.organizations.includes(job.organization_name);
+        
+        const matchesSkills = !skillSearch || 
+            job.requirements?.some(req => req.toLowerCase().includes(skillSearch.toLowerCase())) ||
+            job.description?.toLowerCase().includes(skillSearch.toLowerCase()) ||
+            job.title?.toLowerCase().includes(skillSearch.toLowerCase());
 
-        return matchesGlobalSearch && matchesLocation && matchesExperience && matchesDegree && matchesType && matchesOrg;
+        return matchesGlobalSearch && matchesLocation && matchesExperience && matchesDegree && matchesType && matchesOrg && matchesSkills;
     });
 
     if (loading) {

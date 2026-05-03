@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getRecruiterApplications, updateApplicationStatus } from '../../services/applicationService';
 import {
     Search,
@@ -86,13 +86,16 @@ const RecruiterApplications = () => {
         return 'text-red-500 font-bold';
     };
 
-    const filteredApplications = applications.filter(app => {
-        const matchesSearch =
-            app.candidate_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            app.job_title?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = activeTab === 'ALL' || app.status === activeTab;
-        return matchesSearch && matchesStatus;
-    });
+    const filteredApplications = useMemo(() => {
+        return applications.filter(app => {
+            const matchesSearch =
+                app.candidate_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                app.job_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                app.candidate_email?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = activeTab === 'ALL' || app.status === activeTab;
+            return matchesSearch && matchesStatus;
+        });
+    }, [applications, searchTerm, activeTab]);
 
     if (loading) {
         return (
@@ -165,7 +168,6 @@ const RecruiterApplications = () => {
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-sm font-medium text-white">{app.candidate_name}</span>
-                                                    <span className="text-xs text-muted-foreground">{app.candidate_email || 'email@example.com'}</span>
                                                 </div>
                                             </div>
                                         </td>
@@ -195,20 +197,6 @@ const RecruiterApplications = () => {
                                                     title="View Profile"
                                                 >
                                                     <Eye size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleStatusUpdate(app.id, 'SHORTLISTED')}
-                                                    className="p-1.5 hover:bg-emerald-500/10 rounded-full text-muted-foreground hover:text-emerald-500 transition-colors"
-                                                    title="Approve"
-                                                >
-                                                    <Check size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleStatusUpdate(app.id, 'REJECTED')}
-                                                    className="p-1.5 hover:bg-red-500/10 rounded-full text-muted-foreground hover:text-red-500 transition-colors"
-                                                    title="Reject"
-                                                >
-                                                    <X size={16} />
                                                 </button>
                                             </div>
                                         </td>
